@@ -1,0 +1,8 @@
+{
+  "name": "plot-and-scheme",
+  "version": "2.4.0",
+  "type": "module",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}

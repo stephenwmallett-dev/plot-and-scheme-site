@@ -1,0 +1,3544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Plot&Scheme">
+<meta name="theme-color" content="#fafaf7">
+<link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogIlBsb3QmU2NoZW1lIiwKICAic2hvcnRfbmFtZSI6ICJQbG90JlNjaGVtZSIsCiAgImRlc2NyaXB0aW9uIjogIkZhbWlseSBhdCB0aGUgY2VudGVyLiBQcm9qZWN0cyBpbiBvcmJpdC4iLAogICJzdGFydF91cmwiOiAiLi8iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNmYWZhZjciLAogICJ0aGVtZV9jb2xvciI6ICIjMGEwYTBhIiwKICAiaWNvbnMiOiBbeyJzcmMiOiAiZGF0YTppbWFnZS9zdmcreG1sO3V0Zjgsc2Z0Iiwic2l6ZXMiOiAiYW55IiwidHlwZSI6ICJpbWFnZS9zdmcreG1sIn1dCn0=">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='%230a0a0a'/><circle cx='32' cy='32' r='6' fill='%23fafaf7'/><circle cx='48' cy='20' r='3' fill='%23fafaf7'/><circle cx='14' cy='44' r='3' fill='%23fafaf7'/><circle cx='50' cy='46' r='3' fill='%23fafaf7'/><line x1='32' y1='32' x2='48' y2='20' stroke='%23fafaf7' stroke-width='0.8'/><line x1='32' y1='32' x2='14' y2='44' stroke='%23fafaf7' stroke-width='0.8'/><line x1='32' y1='32' x2='50' y2='46' stroke='%23fafaf7' stroke-width='0.8'/></svg>">
+<title>Plot&Scheme</title>
+<style>
+:root {
+  --paper: #fafaf7;
+  --paper-warm: #f3f1ea;
+  --ink: #0a0a0a;
+  --ink-soft: #2a2a28;
+  --ink-mute: #6b6b66;
+  --ink-faint: #aeaea6;
+  --line: rgba(10, 10, 10, 0.12);
+  --line-strong: rgba(10, 10, 10, 0.35);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0; height: 100%; overflow: hidden;
+  background: var(--paper); color: var(--ink);
+  font-family: 'Times New Roman', Georgia, serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+#app { position: fixed; inset: 0; display: flex; flex-direction: column; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: calc(var(--safe-top) + 12px) 18px 12px;
+  border-bottom: 0.5px solid var(--line);
+  background: var(--paper); z-index: 10; flex-shrink: 0;
+}
+.brand {
+  font-size: 20px; font-style: italic; letter-spacing: -0.01em;
+  display: flex; align-items: center; gap: 6px;
+}
+.brand .amp { color: var(--ink-mute); font-weight: 300; font-size: 24px; line-height: 1; font-style: normal; }
+.brand .scheme { font-style: normal; font-weight: bold; }
+.sync-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #6b6b66;
+  margin-left: 6px;
+  transition: background 0.3s;
+}
+.sync-dot.sync-idle { background: #7fb069; }
+.sync-dot.sync-syncing { background: #e8b04b; }
+.sync-dot.sync-offline { background: #b6b6b0; }
+.sync-dot.sync-error { background: #c73c2e; }
+.map-name {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-mute); cursor: pointer;
+  padding: 6px 10px; border: 0.5px solid var(--line);
+  border-radius: 2px; background: transparent;
+}
+.map-name:hover { color: var(--ink); border-color: var(--line-strong); }
+
+.canvas-wrap {
+  flex: 1; position: relative; overflow: hidden;
+  cursor: grab; background: var(--paper); touch-action: none;
+}
+.canvas-wrap.grabbing { cursor: grabbing; }
+.canvas-wrap svg {
+  display: block; width: 100%; height: 100%;
+  user-select: none; -webkit-user-select: none;
+}
+
+.status {
+  position: absolute; top: 10px; left: 10px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px; letter-spacing: 0.05em; color: var(--ink-mute);
+  background: var(--paper); padding: 6px 10px;
+  border: 0.5px solid var(--line); border-radius: 2px;
+  pointer-events: none; max-width: calc(100% - 20px);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.status .lbl { color: var(--ink-faint); text-transform: uppercase; }
+.status .val { color: var(--ink); margin-left: 6px; font-weight: bold; }
+
+/* Floating action buttons (priority + trash) attached to selected node */
+.float-actions {
+  position: absolute;
+  display: flex;
+  gap: 6px;
+  pointer-events: none; /* container — buttons enable pointer */
+  z-index: 5;
+  transition: opacity 100ms ease;
+}
+.float-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 0.5px solid var(--line-strong);
+  color: var(--ink-soft);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  padding: 0;
+  box-shadow: 0 1px 3px rgba(10, 10, 10, 0.08);
+}
+.float-btn:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.float-btn-danger:hover { background: #c73c2e; border-color: #c73c2e; color: var(--paper); }
+.float-btn.priority-on { background: #c73c2e; color: var(--paper); border-color: #c73c2e; }
+.float-btn.date-on { background: #c73c2e; color: var(--paper); border-color: #c73c2e; }
+.float-btn.done-on { background: #0a0a0a; color: var(--paper); border-color: #0a0a0a; }
+
+/* Multi-select bar shown when marquee selection is active */
+.multi-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--paper);
+  border: 0.5px solid var(--line-strong);
+  border-radius: 2px;
+  overflow: hidden;
+  z-index: 6;
+  box-shadow: 0 1px 4px rgba(10,10,10,0.08);
+  max-width: calc(100% - 24px);
+}
+.multi-count {
+  padding: 10px 14px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border-right: 0.5px solid var(--line);
+  white-space: nowrap;
+}
+.multi-action {
+  background: transparent;
+  border: none;
+  border-right: 0.5px solid var(--line);
+  padding: 10px 14px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.multi-action:last-child { border-right: none; }
+.multi-action:hover { background: var(--paper-warm); color: var(--ink); }
+.multi-action-danger:hover { background: #c73c2e; color: var(--paper); }
+.multi-clear { color: var(--ink-mute); }
+
+/* Marquee rectangle being drawn */
+.marquee-rect {
+  fill: rgba(10, 10, 10, 0.04);
+  stroke: var(--ink);
+  stroke-width: 0.75;
+  stroke-dasharray: 3 3;
+}
+
+.zoom-controls {
+  position: absolute; top: 10px; right: 10px;
+  display: flex; flex-direction: column;
+  background: var(--paper); border: 0.5px solid var(--line);
+  border-radius: 2px; overflow: hidden;
+}
+.zoom-controls button {
+  width: 36px; height: 36px;
+  background: transparent; border: none;
+  border-bottom: 0.5px solid var(--line);
+  font-size: 18px; color: var(--ink-soft);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+.zoom-controls button:last-child { border-bottom: none; }
+.zoom-controls button:hover { background: var(--paper-warm); color: var(--ink); }
+
+.toolbar {
+  position: absolute; bottom: calc(var(--safe-bot) + 14px);
+  left: 50%; transform: translateX(-50%);
+  display: flex; background: var(--paper);
+  border: 0.5px solid var(--line-strong); border-radius: 2px;
+  overflow: hidden; max-width: calc(100% - 24px);
+}
+.tool {
+  background: transparent; border: none;
+  border-right: 0.5px solid var(--line);
+  padding: 11px 14px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--ink-soft); cursor: pointer; white-space: nowrap;
+}
+.tool:last-child { border-right: none; }
+.tool:hover:not([disabled]) { background: var(--paper-warm); color: var(--ink); }
+.tool:active:not([disabled]) { background: var(--ink); color: var(--paper); }
+.tool[disabled] { color: var(--ink-faint); cursor: not-allowed; }
+.tool .glyph { font-style: italic; font-size: 13px; text-transform: none; letter-spacing: 0; margin-right: 5px; }
+
+.sheet-bg {
+  position: fixed; inset: 0; background: rgba(10, 10, 10, 0.4);
+  display: flex; align-items: flex-end; justify-content: center; z-index: 100;
+}
+.sheet {
+  background: var(--paper); width: 100%; max-width: 440px;
+  border-radius: 2px 2px 0 0;
+  padding: 24px 22px calc(var(--safe-bot) + 22px);
+  border-top: 0.5px solid var(--line-strong);
+}
+@media (min-width: 600px) {
+  .sheet-bg { align-items: center; }
+  .sheet { border-radius: 2px; max-width: 420px; }
+}
+.sheet h3 {
+  font-style: italic; font-weight: normal; font-size: 22px;
+  margin: 0 0 4px; letter-spacing: -0.01em; color: var(--ink);
+}
+.sheet .sub {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--ink-mute); margin-bottom: 18px;
+}
+.sheet input {
+  width: 100%; background: transparent; border: none;
+  border-bottom: 0.5px solid var(--line-strong);
+  font-family: 'Times New Roman', Georgia, serif;
+  font-size: 17px; padding: 6px 0; color: var(--ink);
+  outline: none; margin-bottom: 14px;
+  -webkit-appearance: none; border-radius: 0;
+}
+.sheet input:focus { border-bottom-color: var(--ink); }
+.sheet input[type="date"], .sheet input[type="time"] {
+  -webkit-appearance: auto;
+  appearance: auto;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+.date-row {
+  display: flex; gap: 14px;
+  margin-bottom: 8px;
+}
+.date-field { flex: 1; min-width: 0; }
+.date-field input {
+  margin-bottom: 6px;
+}
+.date-label {
+  display: block;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-bottom: 4px;
+}
+.sheet-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.sheet-actions-narrow button { flex: 1 1 calc(33% - 6px); min-width: 90px; padding: 11px 8px; font-size: 10px; }
+.sheet-actions button {
+  flex: 1; min-width: 80px; padding: 12px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  background: transparent; border: 0.5px solid var(--line-strong);
+  color: var(--ink); cursor: pointer; border-radius: 2px;
+}
+.sheet-actions button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.sheet-actions button:hover { background: var(--paper-warm); }
+.sheet-actions button.primary:hover { background: var(--ink-soft); }
+
+.sheet-tall {
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+.sheet-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; margin-bottom: 16px;
+}
+.sheet-head h3 { margin: 0 0 4px; }
+.sheet-head .sub { margin-bottom: 0; }
+.view-tabs {
+  display: flex; gap: 0;
+  border: 0.5px solid var(--line-strong);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.view-tab {
+  background: transparent;
+  border: none;
+  border-right: 0.5px solid var(--line);
+  padding: 7px 9px;
+  cursor: pointer;
+  color: var(--ink-mute);
+  display: flex; align-items: center; justify-content: center;
+}
+.view-tab:last-child { border-right: none; }
+.view-tab:hover { background: var(--paper-warm); color: var(--ink); }
+.view-tab.active { background: var(--ink); color: var(--paper); }
+
+.switcher-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+  min-height: 0;
+}
+
+.map-list {
+  display: flex; flex-direction: column;
+  margin: 0 -22px 8px;
+  border-top: 0.5px solid var(--line);
+}
+.map-item {
+  display: flex; align-items: center; gap: 14px;
+  background: transparent; border: none;
+  border-bottom: 0.5px solid var(--line);
+  padding: 14px 22px;
+  cursor: pointer;
+  font-family: 'Times New Roman', Georgia, serif;
+  font-size: 17px; color: var(--ink);
+  text-align: left; width: 100%;
+}
+.map-item:hover { background: var(--paper-warm); }
+.map-item.active { background: var(--paper-warm); }
+
+.map-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0 -2px 8px;
+  padding: 2px;
+}
+.map-card {
+  display: flex; flex-direction: column;
+  background: var(--paper);
+  border: 0.5px solid var(--line-strong);
+  border-radius: 2px;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  overflow: hidden;
+}
+.map-card:hover { background: var(--paper-warm); }
+.map-card.active { border-width: 2px; border-color: var(--ink); }
+
+.big-picture-card {
+  grid-column: 1 / -1;
+  background: var(--ink);
+}
+.big-picture-card:hover { background: #1a1a18; }
+.big-picture-card .map-card-name { color: var(--paper); }
+.big-picture-card .map-card-count { color: var(--ink-faint); }
+
+.locked-in-card {
+  grid-column: 1 / -1;
+  background: var(--paper);
+  border: 1px solid #c73c2e;
+}
+.locked-in-card:hover { background: #fff5f3; }
+.locked-in-card .map-card-name { color: #c73c2e; font-weight: 600; }
+.locked-in-card .map-card-count { color: #c73c2e; }
+.li-thumb {
+  background: var(--paper) !important;
+  border-bottom: 0.5px solid rgba(199, 60, 46, 0.2) !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px;
+}
+.li-thumb-icon { display: flex; }
+.li-thumb-label {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c73c2e;
+  font-weight: 600;
+}
+.li-dot {
+  background: #c73c2e !important;
+}
+.li-item .map-item-name { color: #c73c2e; font-weight: 500; }
+.bp-thumb {
+  background: var(--ink) !important;
+  border-bottom: 0.5px solid rgba(255,255,255,0.1) !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+}
+.bp-mini-dots {
+  display: flex; gap: 6px;
+}
+.bp-mini-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 0.5px solid rgba(255,255,255,0.2);
+}
+.bp-thumb-label {
+  font-family: 'Times New Roman', Georgia, serif;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--paper);
+  letter-spacing: -0.01em;
+}
+.bp-dot {
+  background: linear-gradient(135deg, #c75a3a, #d4a017, #6b7a3a, #3d6b6e, #6b3a52) !important;
+}
+.bp-item .map-item-name { display: flex; align-items: baseline; gap: 8px; }
+.bp-sub {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+/* Big-picture toolbar shows everything; add buttons route adds to the source map of the selected node */
+.tool-focus { display: none; }
+body.big-picture-mode .tool-focus { display: inline-flex; }
+body.locked-in-mode .tool-focus { display: inline-flex; }
+
+.tool-icon {
+  padding: 11px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tool-divider {
+  width: 0.5px;
+  background: var(--line-strong);
+  align-self: stretch;
+  margin: 0;
+}
+.map-card-thumb {
+  background: var(--paper-warm);
+  height: 90px;
+  display: flex; align-items: center; justify-content: center;
+  border-bottom: 0.5px solid var(--line);
+}
+.map-card-meta {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px 2px;
+}
+.map-card-name {
+  font-family: 'Times New Roman', Georgia, serif;
+  font-size: 14px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.map-card-count {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  padding: 0 10px 8px;
+}
+
+.map-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 0.5px solid var(--line-strong);
+  flex-shrink: 0;
+}
+.map-item .map-dot { width: 18px; height: 18px; border-width: 1px; }
+
+.map-item-name { flex: 1; }
+.map-item-current {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.color-wheel-wrap {
+  display: flex; flex-direction: column; align-items: center;
+  margin: 8px 0 18px;
+}
+.color-wheel-label {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-mute); margin-bottom: 12px; align-self: flex-start;
+}
+.color-wheel {
+  position: relative;
+  width: 200px; height: 200px;
+}
+.color-wheel .dot {
+  position: absolute;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  cursor: pointer; padding: 0;
+  transform: translate(-50%, -50%);
+  transition: transform 80ms ease, border-color 80ms ease;
+}
+.color-wheel .dot:hover { transform: translate(-50%, -50%) scale(1.15); }
+.color-wheel .dot.selected {
+  border: 2.5px solid var(--ink);
+  transform: translate(-50%, -50%) scale(1.2);
+}
+.color-wheel .dot.none {
+  background: var(--paper);
+  position: absolute;
+}
+.color-wheel .dot.none::after {
+  content: ''; position: absolute;
+  top: 50%; left: 15%; right: 15%; height: 1px;
+  background: var(--ink-mute);
+  transform: rotate(-45deg);
+}
+
+.toast {
+  position: fixed; bottom: calc(var(--safe-bot) + 80px);
+  left: 50%; transform: translateX(-50%);
+  background: var(--ink); color: var(--paper);
+  padding: 10px 16px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+  border-radius: 2px; z-index: 200;
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand"><span>Plot</span><span class="amp">&</span><span class="scheme">Scheme</span></div>
+    <button class="map-name" id="mapName">My orbit</button>
+    <span class="sync-dot sync-idle" id="syncDot" title="Sync: idle"></span>
+  </header>
+  <div class="canvas-wrap" id="wrap">
+    <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
+      <g id="world">
+        <g id="links"></g>
+        <g id="nodes"></g>
+      </g>
+      <g id="marqueeLayer"></g>
+    </svg>
+    <div class="float-actions" id="floatActions" style="display:none;">
+      <button class="float-btn" id="floatPriority" aria-label="Toggle priority" title="Mark priority">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+          <polygon points="8,1.5 10,6 14.5,6 11,9 12.5,13.5 8,10.8 3.5,13.5 5,9 1.5,6 6,6"/>
+        </svg>
+      </button>
+      <button class="float-btn" id="floatDate" aria-label="Set due date" title="Set due date">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3.5" width="12" height="10.5" rx="1"/>
+          <line x1="2" y1="6.5" x2="14" y2="6.5"/>
+          <line x1="5" y1="2" x2="5" y2="5"/>
+          <line x1="11" y1="2" x2="11" y2="5"/>
+        </svg>
+      </button>
+      <button class="float-btn" id="floatDone" aria-label="Mark complete" title="Mark complete">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="8" cy="8" r="6.25"/>
+          <polyline points="5.2,8.2 7.1,10.1 10.9,5.9"/>
+        </svg>
+      </button>
+      <button class="float-btn float-btn-danger" id="floatDelete" aria-label="Delete" title="Delete">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 4h10M5 4V2.5h6V4M4 4l1 9.5h6L12 4M6.5 6.5v5M9.5 6.5v5"/>
+        </svg>
+      </button>
+    </div>
+    <div class="multi-bar" id="multiBar" style="display:none;">
+      <span class="multi-count" id="multiCount">0 selected</span>
+      <button class="multi-action" id="multiPriority">Toggle priority</button>
+      <button class="multi-action multi-action-danger" id="multiDelete">Delete all</button>
+      <button class="multi-action multi-clear" id="multiClear">Cancel</button>
+    </div>
+    <div class="status">
+      <span class="lbl">selected</span>
+      <span class="val" id="statusValue">none</span>
+    </div>
+    <div class="zoom-controls">
+      <button id="zoomIn" aria-label="Zoom in">+</button>
+      <button id="zoomOut" aria-label="Zoom out">−</button>
+      <button id="zoomReset" aria-label="Reset" style="font-size: 13px;">⊙</button>
+    </div>
+    <div class="toolbar">
+      <button class="tool tool-icon" id="undoBtn" aria-label="Undo" title="Undo (Cmd-Z)">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 5h6.5a2.5 2.5 0 0 1 0 5H7"/>
+          <polyline points="5,3 3,5 5,7"/>
+        </svg>
+      </button>
+      <button class="tool tool-icon" id="redoBtn" aria-label="Redo" title="Redo (Cmd-Shift-Z)">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 5H4.5a2.5 2.5 0 0 0 0 5H7"/>
+          <polyline points="9,3 11,5 9,7"/>
+        </svg>
+      </button>
+      <span class="tool-divider"></span>
+      <button class="tool" id="addProject"><span class="glyph">+</span>Project</button>
+      <button class="tool" id="addTodo"><span class="glyph">+</span>To-do</button>
+      <button class="tool" id="editNode">Edit</button>
+      <button class="tool tool-focus" id="focusMap">Focus map</button>
+      <button class="tool" id="deleteNode">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Plot&Scheme — bare bones, single file, IndexedDB persistence
+// ============================================================
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const MIN_ZOOM = 0.3, MAX_ZOOM = 3.0, DRAG_THRESHOLD = 4, SAVE_DEBOUNCE_MS = 400;
+
+// Project color palette — 12-step hue wheel, muted to sit on paper.
+// Each entry: { fill: project bubble bg, text: project text, todoFill: child todo bg, todoBorder: child todo edge }
+function makeWheelEntry(hue) {
+  // Muted, paper-friendly: lower saturation, mid lightness for project fill.
+  const fill = `hsl(${hue}, 42%, 42%)`;
+  const todoFill = `hsl(${hue}, 35%, 92%)`;
+  const todoBorder = `hsl(${hue}, 42%, 42%)`;
+  return { fill, text: '#fafaf7', todoFill, todoBorder };
+}
+const WHEEL_HUES = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
+const COLORS = { none: null };
+WHEEL_HUES.forEach(h => { COLORS['h' + h] = makeWheelEntry(h); });
+const COLOR_KEYS = ['none', ...WHEEL_HUES.map(h => 'h' + h)];
+
+// Type styling — height is fixed, width grows with the label.
+// Short labels render as circles, longer labels as pills.
+const TYPE_STYLE = {
+  center:  { h: 80, fontSize: 22, padX: 28, font: "italic 22px 'Times New Roman', Georgia, serif" },
+  family:  { h: 56, fontSize: 15, padX: 22, font: "500 15px 'Times New Roman', Georgia, serif" },
+  project: { h: 60, fontSize: 16, padX: 24, font: "bold 16px 'Times New Roman', Georgia, serif" },
+  todo:    { h: 44, fontSize: 12, padX: 18, font: "12px ui-monospace, Menlo, monospace" }
+};
+
+// Cached canvas for measuring text width
+let _measureCtx = null;
+function measureText(text, font) {
+  if (!_measureCtx) _measureCtx = document.createElement('canvas').getContext('2d');
+  _measureCtx.font = font;
+  return _measureCtx.measureText(text).width;
+}
+
+// Compute bubble dimensions for a node based on its label
+function nodeDims(n) {
+  const style = TYPE_STYLE[n.type];
+  // Use bold/uppercase metrics when the node has bold flag — otherwise the bubble
+  // would clip after toggling. We swap the font to a heavy weight version.
+  const label = n.bold ? (n.label || '').toUpperCase() : n.label;
+  const font = n.bold
+    ? style.font.replace(/^(italic |bold |500 |400 )?/, '900 ')
+    : style.font;
+  const textW = measureText(label, font);
+  const minW = style.h; // never narrower than tall — keeps circles when label is short
+  const w = Math.max(minW, Math.ceil(textW) + style.padX * 2);
+  return { w, h: style.h, fontSize: style.fontSize, rx: style.h / 2 };
+}
+
+// Determine whether `target` is a valid new parent for `dragged`.
+// Rules:
+//   - Can't drop onto self
+//   - Can't drop onto a descendant (would create a cycle)
+//   - To-dos can't have children, so they're never valid parents
+//   - In Big Picture, must be in the same source map
+function isValidReparentTarget(dragged, target) {
+  if (!dragged || !target) return false;
+  if (dragged.id === target.id) return false;
+  if (target.type === 'todo') return false; // to-dos can't be parents
+  if (state.bigPicture) {
+    if (dragged._sourceMapId !== target._sourceMapId) return false;
+  }
+  // Walk up from target to root — if dragged is an ancestor, it's a cycle
+  let cur = target;
+  const visited = new Set();
+  while (cur) {
+    if (cur.id === dragged.id) return false;
+    if (visited.has(cur.id)) break;
+    visited.add(cur.id);
+    if (!cur.parent) break;
+    cur = state.doc.nodes.find(n => n.id === cur.parent);
+  }
+  return true;
+}
+
+// Clear color override on a node and all its descendants in the active doc.
+// Used after reparent so the moved subtree inherits the new parent's color.
+function clearColorOverridesRecursive(rootId) {
+  const set = new Set([rootId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    state.doc.nodes.forEach(n => {
+      if (n.parent && set.has(n.parent) && !set.has(n.id)) {
+        set.add(n.id);
+        changed = true;
+      }
+    });
+  }
+  set.forEach(id => {
+    const n = state.doc.nodes.find(x => x.id === id);
+    if (n) delete n.color;
+  });
+}
+
+// Same descendant collection but on an arbitrary map (for big-picture source writes)
+function collectDescendantsInMap(map, rootId) {
+  const set = new Set([rootId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    map.nodes.forEach(n => {
+      if (n.parent && set.has(n.parent) && !set.has(n.id)) {
+        set.add(n.id);
+        changed = true;
+      }
+    });
+  }
+  return set;
+}
+
+// Find which node (if any) the dragged bubble is overlapping with.
+// Uses bubble-to-bubble proximity rather than cursor-to-target — feels more natural
+// because you're dragging a whole bubble, not a precise cursor point.
+function findReparentTarget(dragged, cursorX, cursorY) {
+  const SNAP_BUFFER = 30; // bubbles need only get within 30px of each other
+  const draggedDim = nodeDims(dragged);
+  let best = null;
+  let bestDist = Infinity;
+  state.doc.nodes.forEach(n => {
+    if (!isValidReparentTarget(dragged, n)) return;
+    const dim = nodeDims(n);
+    // Distance between bubble *centers*, minus their combined "reach"
+    // (half-widths if approaching horizontally, half-heights vertically).
+    // Use the smaller dimension to stay tolerant for circular shapes.
+    const centerDx = Math.abs(dragged.x - n.x);
+    const centerDy = Math.abs(dragged.y - n.y);
+    const draggedReach = Math.min(draggedDim.w, draggedDim.h) / 2;
+    const targetReach = Math.min(dim.w, dim.h) / 2;
+    // Edge-to-edge distance approximation: how far apart the bubbles are
+    const edgeGap = Math.max(0, Math.hypot(centerDx, centerDy) - draggedReach - targetReach);
+    if (edgeGap < SNAP_BUFFER && edgeGap < bestDist) {
+      best = n;
+      bestDist = edgeGap;
+    }
+  });
+  return best ? best.id : null;
+}
+
+let _idc = 0;
+function nid() { return 'n_' + Date.now().toString(36) + '_' + (_idc++).toString(36) + Math.random().toString(36).slice(2, 5); }
+
+// ============================================================
+// Storage — IndexedDB
+// ============================================================
+const DB_NAME = 'plot-and-scheme', STORE = 'maps';
+const DB_VERSION = 2; // bumped — v0.5 reseeds 5 starter maps
+let dbPromise = null;
+function openDB() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = req.result;
+      // Fresh start on upgrade — wipes the old single-map data.
+      if (db.objectStoreNames.contains(STORE)) db.deleteObjectStore(STORE);
+      db.createObjectStore(STORE, { keyPath: 'id' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return dbPromise;
+}
+async function loadMap(id) {
+  try {
+    const db = await openDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) { console.warn('loadMap', e); return null; }
+}
+let saveMap = async function(doc) {
+  try {
+    const db = await openDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(doc);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) { console.warn('saveMap', e); }
+};
+let loadAllMaps = async function() {
+  try {
+    const db = await openDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) { console.warn('loadAllMaps', e); return []; }
+};
+
+// ============================================================
+// Cloud sync layer
+// ============================================================
+// Wraps the local IndexedDB storage above.
+// Reads pull from cloud (with local fallback if offline).
+// Writes go to cloud AND local cache. Failed cloud writes queue for retry.
+const CLOUD_ENDPOINT = '/.netlify/functions/maps';
+const PASS_KEY = 'ps-pass';
+let cloudEnabled = true;
+let syncStatus = 'idle'; // 'idle' | 'syncing' | 'offline' | 'error'
+const pendingWrites = new Map(); // id -> map object (latest version)
+
+function getPass() {
+  try { return localStorage.getItem(PASS_KEY) || ''; } catch { return ''; }
+}
+function setPass(p) {
+  try { localStorage.setItem(PASS_KEY, p); } catch {}
+}
+
+async function cloudFetch(path, opts = {}) {
+  const headers = Object.assign({}, opts.headers || {}, {
+    'x-ps-pass': getPass(),
+    'content-type': 'application/json'
+  });
+  const res = await fetch(CLOUD_ENDPOINT + (path || ''), Object.assign({}, opts, { headers }));
+  if (res.status === 401) {
+    throw new Error('unauthorized');
+  }
+  if (!res.ok) {
+    throw new Error('http ' + res.status);
+  }
+  return res.json();
+}
+
+async function cloudLoadAll() {
+  const data = await cloudFetch('', { method: 'GET' });
+  return data.maps || [];
+}
+
+async function cloudSaveMap(map) {
+  return await cloudFetch('', { method: 'POST', body: JSON.stringify(map) });
+}
+
+// Public: replace loadAllMaps and saveMap behavior with cloud-first
+async function loadAllMapsSynced() {
+  try {
+    setSyncStatus('syncing');
+    const cloud = await cloudLoadAll();
+    // Mirror cloud into local IDB so we have a cache
+    for (const m of cloud) await saveMapLocal(m);
+    setSyncStatus('idle');
+    return cloud;
+  } catch (e) {
+    console.warn('cloud load failed, falling back to local', e);
+    if (String(e.message) === 'unauthorized') {
+      setSyncStatus('error');
+      throw e; // let caller re-prompt for password
+    }
+    setSyncStatus('offline');
+    return await loadAllMapsLocal();
+  }
+}
+
+async function saveMapLocal(doc) {
+  // Direct IDB write, bypassing the reassignable saveMap binding
+  try {
+    const db = await openDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(doc);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) { console.warn('saveMapLocal', e); }
+}
+
+async function loadAllMapsLocal() {
+  try {
+    const db = await openDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) { console.warn('loadAllMapsLocal', e); return []; }
+}
+
+async function saveMapSynced(doc) {
+  // Always cache locally so refresh works even offline
+  await saveMapLocal(doc);
+  // Then try cloud
+  try {
+    setSyncStatus('syncing');
+    await cloudSaveMap(doc);
+    pendingWrites.delete(doc.id);
+    setSyncStatus('idle');
+  } catch (e) {
+    console.warn('cloud save failed, queued', e);
+    pendingWrites.set(doc.id, doc);
+    setSyncStatus('offline');
+  }
+}
+
+// Retry queued writes when network comes back
+async function drainPendingWrites() {
+  if (pendingWrites.size === 0) return;
+  const entries = Array.from(pendingWrites.values());
+  for (const m of entries) {
+    try {
+      await cloudSaveMap(m);
+      pendingWrites.delete(m.id);
+    } catch { /* stay queued */ }
+  }
+  if (pendingWrites.size === 0) setSyncStatus('idle');
+}
+
+function setSyncStatus(s) {
+  syncStatus = s;
+  const el = document.getElementById('syncDot');
+  if (!el) return;
+  el.className = 'sync-dot sync-' + s;
+  el.title = 'Sync: ' + s;
+}
+
+window.addEventListener('online', drainPendingWrites);
+window.addEventListener('focus', drainPendingWrites);
+setInterval(drainPendingWrites, 15000);
+
+// Prompt for password if we don't have one, or if the cloud rejected our current one.
+async function ensureCloudAccess() {
+  if (getPass()) return true;
+  const p = await promptPassword();
+  if (!p) return false;
+  setPass(p);
+  return true;
+}
+
+function promptPassword(errorMsg) {
+  return new Promise((resolve) => {
+    const bg = document.createElement('div');
+    bg.className = 'sheet-bg';
+    bg.innerHTML = `
+      <div class="sheet" role="dialog">
+        <h3>Sync passcode</h3>
+        <div class="sub">${errorMsg || 'enter passcode to sync across your devices'}</div>
+        <input type="password" id="passIn" autocomplete="current-password" />
+        <div class="sheet-actions">
+          <button class="primary" data-action="save">Unlock</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(bg);
+    const input = bg.querySelector('#passIn');
+    setTimeout(() => input.focus(), 50);
+    function close(v) { bg.remove(); resolve(v); }
+    bg.querySelector('[data-action="save"]').addEventListener('click', () => {
+      close(input.value.trim());
+    });
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') close(input.value.trim());
+    });
+  });
+}
+
+// Redirect saveMap and loadAllMaps to the cloud-synced versions.
+// Local paths are still available as saveMapLocal / loadAllMapsLocal.
+saveMap = saveMapSynced;
+loadAllMaps = loadAllMapsSynced;
+
+// ============================================================
+// Seed
+// ============================================================
+
+// Five starter maps. Family is black (no color = ink). Others use the wheel.
+// Hue numbers correspond to entries in COLORS as 'h{hue}'.
+const STARTER_MAPS = [
+  { id: 'family',      name: 'Family',           color: 'none', label: 'Family' },
+  { id: 'launch',      name: 'UP / Awards / LAUNCH', color: 'h210', label: 'UP / LAUNCH' },
+  { id: 'screenplays', name: 'Screenplays',      color: 'h300', label: 'Screenplays' },
+  { id: 'equipment',   name: 'Equipment',        color: 'h150', label: 'Equipment' },
+  { id: 'nancy',       name: 'Nancy Mace',       color: 'h0',   label: 'Nancy Mace' }
+];
+
+function seedMap(meta) {
+  return {
+    id: meta.id,
+    name: meta.name,
+    color: meta.color,
+    updatedAt: Date.now(),
+    nodes: [
+      { id: 'center', label: meta.label, type: 'center', x: 800, y: 600 }
+    ]
+  };
+}
+
+function seedAllMaps() {
+  return STARTER_MAPS.map(seedMap);
+}
+
+// ============================================================
+// State
+// ============================================================
+const state = {
+  maps: [],          // array of all map docs
+  doc: null,         // currently active map (reference into state.maps OR synthetic for big-picture)
+  bigPicture: false, // when true, state.doc is a synthetic aggregation of all maps
+  lockedIn: false,   // when true, state.doc is a synthetic stack of priority/due nodes
+  selectedId: null,
+  multiSelected: null,    // Set<id> when marquee selection is active
+  marquee: null,          // { startX, startY, x, y } during draw
+  zoom: 1, panX: 0, panY: 0,
+  drag: null, pinch: null,
+  saveTimer: null,
+  lastTap: null           // { id, t } for double-tap detection
+};
+
+// In big-picture mode each synthetic node has _sourceMapId and _sourceId.
+// We never mutate the synthetic node's x/y as truth — drag deltas write through
+// to the source node (subtracting the cluster offset).
+const ALL_MAP_ID = '__all__';
+const LOCKED_MAP_ID = '__locked__';
+
+// ============================================================
+// Undo / Redo
+// ============================================================
+const UNDO_LIMIT = 99;
+const undoStack = [];
+const redoStack = [];
+
+// Capture a snapshot of all maps (deep clone). Cheap — maps are small.
+function snapshotMaps() {
+  return state.maps.map(m => ({
+    id: m.id,
+    name: m.name,
+    color: m.color,
+    updatedAt: m.updatedAt,
+    nodes: m.nodes.map(n => ({ ...n }))
+  }));
+}
+
+// Restore a snapshot into state.maps and rebuild state.doc.
+function restoreSnapshot(snap) {
+  // Replace maps with the snapshot (also cloning the snapshot so the stack remains immutable)
+  state.maps = snap.map(m => ({
+    id: m.id,
+    name: m.name,
+    color: m.color,
+    updatedAt: m.updatedAt,
+    nodes: m.nodes.map(n => ({ ...n }))
+  }));
+  if (state.bigPicture) {
+    state.doc = buildBigPictureDoc();
+  } else {
+    // Re-bind state.doc to the same map id
+    const activeId = state.doc?.id;
+    state.doc = state.maps.find(m => m.id === activeId) || state.maps[0];
+    document.getElementById('mapName').textContent = state.doc.name;
+  }
+  state.selectedId = null;
+  state.multiSelected = null;
+}
+
+// Push current state onto the undo stack. Call BEFORE making a change.
+// Clears the redo stack — branching invalidates previously redoable steps.
+function pushUndo() {
+  undoStack.push(snapshotMaps());
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  redoStack.length = 0;
+}
+
+function undo() {
+  if (undoStack.length === 0) { toast('Nothing to undo'); return; }
+  // Snapshot CURRENT state into redo, then restore from undo
+  redoStack.push(snapshotMaps());
+  if (redoStack.length > UNDO_LIMIT) redoStack.shift();
+  const snap = undoStack.pop();
+  restoreSnapshot(snap);
+  render();
+  scheduleSave();
+  toast('Undone');
+}
+
+function redo() {
+  if (redoStack.length === 0) { toast('Nothing to redo'); return; }
+  undoStack.push(snapshotMaps());
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  const snap = redoStack.pop();
+  restoreSnapshot(snap);
+  render();
+  scheduleSave();
+  toast('Redone');
+}
+
+const svg = document.getElementById('canvas');
+const world = document.getElementById('world');
+const linksG = document.getElementById('links');
+const nodesG = document.getElementById('nodes');
+const wrap = document.getElementById('wrap');
+const statusEl = document.getElementById('statusValue');
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function applyTransform() {
+  world.setAttribute('transform', `translate(${state.panX} ${state.panY}) scale(${state.zoom})`);
+  updateFloatActions();
+}
+
+// Show / hide the multi-select bar based on state
+function updateMultiBar() {
+  const bar = document.getElementById('multiBar');
+  if (!bar) return;
+  if (state.multiSelected && state.multiSelected.size > 0) {
+    bar.style.display = 'flex';
+    document.getElementById('multiCount').textContent = `${state.multiSelected.size} selected`;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+// Position the floating action buttons next to the selected node (in screen coords)
+function updateFloatActions() {
+  const float = document.getElementById('floatActions');
+  if (!float) return;
+  // Hide when nothing selected, when marquee mode is active, or when selection is the center
+  if (!state.selectedId || state.multiSelected) {
+    float.style.display = 'none';
+    return;
+  }
+  const node = state.doc.nodes.find(n => n.id === state.selectedId);
+  if (!node) {
+    float.style.display = 'none';
+    return;
+  }
+  // Centers can be priority-flagged but shouldn't be quick-deleted (would orphan a map)
+  const isCenter = node.type === 'center' || (state.bigPicture && node.id.endsWith('__center'));
+  const dim = nodeDims(node);
+  // Top-right corner of the bubble in world coords
+  const wx = node.x + dim.w / 2;
+  const wy = node.y - dim.h / 2;
+  // Convert to screen coords
+  const sx = wx * state.zoom + state.panX;
+  const sy = wy * state.zoom + state.panY;
+  // Offset just outside the bubble
+  const OFF = 8;
+  float.style.left = (sx + OFF) + 'px';
+  float.style.top = (sy - 30) + 'px';
+  float.style.display = 'flex';
+
+  // Priority button reflects current state
+  const priBtn = document.getElementById('floatPriority');
+  if (node.priority) priBtn.classList.add('priority-on');
+  else priBtn.classList.remove('priority-on');
+
+  const dateBtn = document.getElementById('floatDate');
+  if (node.dueDate) dateBtn.classList.add('date-on');
+  else dateBtn.classList.remove('date-on');
+
+  // Done checkbox — only meaningful for to-dos. Hide for centers/projects.
+  const doneBtn = document.getElementById('floatDone');
+  if (node.type === 'todo') {
+    doneBtn.style.display = 'flex';
+    if (node.done) doneBtn.classList.add('done-on');
+    else doneBtn.classList.remove('done-on');
+  } else {
+    doneBtn.style.display = 'none';
+  }
+
+  // Hide trash for centers
+  document.getElementById('floatDelete').style.display = isCenter ? 'none' : 'flex';
+}
+
+// Distance from a pill's center to its edge along direction (ux, uy).
+// A pill = rectangle of width w, height h, with semicircular caps of radius h/2.
+// Inner straight section runs from -(w/2 - r) to (w/2 - r) along x.
+function pillExitDistance(w, h, ux, uy) {
+  const r = h / 2;
+  const halfStraight = Math.max(0, w / 2 - r);
+  // For a circle of radius r centered at origin, exit distance is r.
+  // For a pill, exit point depends on direction:
+  //   - if the ray hits the middle rectangle section, exit distance follows rectangle math
+  //   - if it hits a cap, it follows circle math centered at (±halfStraight, 0)
+  if (halfStraight === 0) {
+    // pure circle
+    return r;
+  }
+  // Try rectangle exit first (top/bottom edges of central section)
+  let tRect = Infinity;
+  if (uy !== 0) {
+    const t = r / Math.abs(uy);
+    const xAtExit = ux * t;
+    if (Math.abs(xAtExit) <= halfStraight) tRect = t;
+  }
+  // Cap exit: solve for intersection with circle at (sign(ux)*halfStraight, 0) of radius r
+  // Pick the cap on the side the ray is heading (sign of ux). If ux === 0, ray is vertical,
+  // doesn't hit caps via this calculation — rectangle solution above will handle it.
+  let tCap = Infinity;
+  if (ux !== 0) {
+    const cx = Math.sign(ux) * halfStraight;
+    // Ray: (t*ux, t*uy), circle: (x - cx)^2 + y^2 = r^2
+    // (t*ux - cx)^2 + (t*uy)^2 = r^2
+    // t^2 - 2*t*ux*cx + cx^2 - r^2 = 0  (since ux^2+uy^2 = 1)
+    const b = -2 * ux * cx;
+    const c = cx * cx - r * r;
+    const disc = b * b - 4 * c;
+    if (disc >= 0) {
+      const sq = Math.sqrt(disc);
+      const t1 = (-b + sq) / 2;
+      const t2 = (-b - sq) / 2;
+      // Want positive t, and the exit point's x must be in the cap region (|x| > halfStraight)
+      [t1, t2].forEach(t => {
+        if (t > 0) {
+          const x = ux * t;
+          if (Math.abs(x) >= halfStraight - 0.001) tCap = Math.min(tCap, t);
+        }
+      });
+    }
+  }
+  return Math.min(tRect, tCap);
+}
+
+function trimLine(p, n) {
+  const dp = nodeDims(p), dn = nodeDims(n);
+  const dx = n.x - p.x, dy = n.y - p.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  const tP = pillExitDistance(dp.w, dp.h, ux, uy);
+  const tN = pillExitDistance(dn.w, dn.h, -ux, -uy);
+  return { x1: p.x + ux * tP, y1: p.y + uy * tP, x2: n.x - ux * tN, y2: n.y - uy * tN };
+}
+
+// Whether this map is rendered as an anchor (black) or themed.
+// Anchor maps have color 'none' — currently just Family.
+function isAnchorMap() {
+  return !state.doc || !state.doc.color || state.doc.color === 'none';
+}
+
+// Map-level color lookup
+function mapColor() {
+  if (isAnchorMap()) return null;
+  return COLORS[state.doc.color] || null;
+}
+
+// Per-node color resolution. Walks up the tree: a node's own color override wins,
+// otherwise inherit from nearest ancestor with a color, otherwise fall back to map color.
+function findNodeById(id) {
+  return state.doc.nodes.find(n => n.id === id);
+}
+
+// Returns the color KEY ('none' or 'h{hue}') that applies to this node, after override walk.
+function effectiveColorKey(n) {
+  // Walk up: own color, then parents, then map fallback
+  let cur = n;
+  while (cur) {
+    if (cur.color) return cur.color; // explicit override (incl. 'none')
+    if (!cur.parent) break;
+    cur = findNodeById(cur.parent);
+    if (!cur) break;
+  }
+  // Map fallback
+  if (state.bigPicture || state.lockedIn) {
+    return n._mapColor || 'none';
+  }
+  return state.doc.color || 'none';
+}
+
+function nodeIsAnchor(n) {
+  const k = effectiveColorKey(n);
+  return !k || k === 'none';
+}
+
+function nodeColor(n) {
+  const k = effectiveColorKey(n);
+  if (!k || k === 'none') return null;
+  return COLORS[k] || null;
+}
+
+function render() {
+  // Rebuild synthetic docs on render so they reflect current source data.
+  // Big-picture only rebuilds explicitly (positions are dragged); Locked In is
+  // computed every render since sort order can change with date edits.
+  if (state.lockedIn) {
+    // Preserve selection if possible across rebuilds
+    const prevSel = state.selectedId;
+    state.doc = buildLockedInDoc();
+    if (prevSel && state.doc.nodes.some(n => n.id === prevSel)) {
+      // selection still exists in the rebuilt doc
+    } else {
+      state.selectedId = null;
+    }
+  }
+  linksG.innerHTML = '';
+  nodesG.innerHTML = '';
+  const byId = Object.fromEntries(state.doc.nodes.map(n => [n.id, n]));
+
+  state.doc.nodes.forEach(n => {
+    if (!n.parent) return;
+    const p = byId[n.parent];
+    if (!p) return;
+    const t = trimLine(p, n);
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', t.x1); line.setAttribute('y1', t.y1);
+    line.setAttribute('x2', t.x2); line.setAttribute('y2', t.y2);
+
+    const nAnchor = nodeIsAnchor(n);
+    const nMc = nodeColor(n);
+
+    if (nAnchor) {
+      line.setAttribute('stroke', 'rgba(10,10,10,0.5)');
+      line.setAttribute('stroke-width', n.type === 'todo' ? 1 : 1.25);
+    } else if (nMc) {
+      line.setAttribute('stroke', nMc.todoBorder);
+      line.setAttribute('stroke-width', n.type === 'todo' ? 1 : 1.25);
+      line.setAttribute('stroke-opacity', n.type === 'todo' ? '0.6' : '0.85');
+    } else {
+      line.setAttribute('stroke', n.type === 'todo' ? 'rgba(10,10,10,0.18)' : 'rgba(10,10,10,0.4)');
+      line.setAttribute('stroke-width', n.type === 'todo' ? 0.75 : 1);
+      if (n.type === 'todo') line.setAttribute('stroke-dasharray', '2 3');
+    }
+    linksG.appendChild(line);
+  });
+
+  state.doc.nodes.forEach(n => {
+    const dim = nodeDims(n);
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('data-id', n.id);
+    g.setAttribute('transform', `translate(${n.x} ${n.y})`);
+    g.style.cursor = 'pointer';
+
+    const isSel = state.selectedId === n.id;
+    const nAnchor = nodeIsAnchor(n);
+    const nMc = nodeColor(n);
+    const rect = document.createElementNS(SVG_NS, 'rect');
+    rect.setAttribute('x', -dim.w / 2);
+    rect.setAttribute('y', -dim.h / 2);
+    rect.setAttribute('width', dim.w);
+    rect.setAttribute('height', dim.h);
+    rect.setAttribute('rx', dim.rx);
+    rect.setAttribute('ry', dim.rx);
+
+    // Resolve fill + stroke. Anchor maps render solid black throughout.
+    // Themed maps use the map's color for projects/todos; center takes the map's color too.
+    let fill, stroke;
+    if (n.type === 'center') {
+      if (nMc) {
+        fill = nMc.fill;
+        stroke = nMc.fill;
+      } else {
+        fill = '#0a0a0a';
+        stroke = '#0a0a0a';
+      }
+    } else if (nAnchor) {
+      fill = '#0a0a0a';
+      stroke = '#0a0a0a';
+    } else if (n.done) {
+      fill = '#f3f1ea';
+      stroke = '#aeaea6';
+    } else if (nMc && n.type === 'project') {
+      fill = nMc.fill;
+      stroke = nMc.fill;
+    } else if (nMc && n.type === 'todo') {
+      fill = nMc.todoFill;
+      stroke = nMc.todoBorder;
+    } else if (n.type === 'family') {
+      // 'family' type used inside anchor maps for sub-anchors (Wife, Kids, House)
+      fill = '#0a0a0a';
+      stroke = '#0a0a0a';
+    } else {
+      fill = '#fafaf7';
+      stroke = '#0a0a0a';
+    }
+    rect.setAttribute('fill', fill);
+    const flagged = n.priority || n.dueDate;
+    rect.setAttribute('stroke', flagged ? '#c73c2e' : stroke);
+    rect.setAttribute('stroke-width', flagged ? 1.6 : (isSel ? 2.5 : 1));
+
+    // Reparent visual states
+    const reparenting = state.drag && state.drag.type === 'reparent';
+    if (reparenting) {
+      const isDragged = state.drag.id === n.id;
+      const isHoverTarget = state.drag.hoverTargetId === n.id;
+      if (isHoverTarget) {
+        rect.setAttribute('stroke', '#0a0a0a');
+        rect.setAttribute('stroke-width', '3');
+      } else if (!isDragged) {
+        g.setAttribute('opacity', '0.3');
+      }
+    }
+
+    g.appendChild(rect);
+
+    // Hover target glow ring (after rect so it sits on top)
+    if (reparenting && state.drag.hoverTargetId === n.id) {
+      const glow = document.createElementNS(SVG_NS, 'rect');
+      glow.setAttribute('x', -dim.w / 2 - 6);
+      glow.setAttribute('y', -dim.h / 2 - 6);
+      glow.setAttribute('width', dim.w + 12);
+      glow.setAttribute('height', dim.h + 12);
+      glow.setAttribute('rx', dim.rx + 6);
+      glow.setAttribute('ry', dim.rx + 6);
+      glow.setAttribute('fill', 'none');
+      glow.setAttribute('stroke', '#0a0a0a');
+      glow.setAttribute('stroke-width', '0.8');
+      glow.setAttribute('stroke-dasharray', '4 3');
+      glow.style.pointerEvents = 'none';
+      g.appendChild(glow);
+    }
+
+    // Multi-select highlight — dashed outer border
+    if (state.multiSelected && state.multiSelected.has(n.id)) {
+      const MS_OFFSET = 4;
+      const ms = document.createElementNS(SVG_NS, 'rect');
+      ms.setAttribute('x', -dim.w / 2 - MS_OFFSET);
+      ms.setAttribute('y', -dim.h / 2 - MS_OFFSET);
+      ms.setAttribute('width', dim.w + MS_OFFSET * 2);
+      ms.setAttribute('height', dim.h + MS_OFFSET * 2);
+      ms.setAttribute('rx', dim.rx + MS_OFFSET);
+      ms.setAttribute('ry', dim.rx + MS_OFFSET);
+      ms.setAttribute('fill', 'none');
+      ms.setAttribute('stroke', '#0a0a0a');
+      ms.setAttribute('stroke-width', '1');
+      ms.setAttribute('stroke-dasharray', '3 3');
+      ms.style.pointerEvents = 'none';
+      g.appendChild(ms);
+    }
+
+    const text = document.createElementNS(SVG_NS, 'text');
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'central');
+    text.setAttribute('font-size', dim.fontSize);
+    text.style.pointerEvents = 'none';
+    text.style.userSelect = 'none';
+
+    const onDark = (n.type === 'center' || nAnchor || n.type === 'family');
+
+    if (n.type === 'center') {
+      text.setAttribute('font-family', "'Times New Roman', Georgia, serif");
+      text.setAttribute('font-style', 'italic');
+      text.setAttribute('fill', '#fafaf7');
+    } else if (n.type === 'family') {
+      text.setAttribute('font-family', "'Times New Roman', Georgia, serif");
+      text.setAttribute('font-weight', '500');
+      text.setAttribute('fill', '#fafaf7');
+    } else if (n.type === 'project') {
+      text.setAttribute('font-family', "'Times New Roman', Georgia, serif");
+      text.setAttribute('font-weight', 'bold');
+      if (n.done) text.setAttribute('fill', '#aeaea6');
+      else if (nAnchor) text.setAttribute('fill', '#fafaf7');
+      else if (nMc) text.setAttribute('fill', nMc.text);
+      else text.setAttribute('fill', '#0a0a0a');
+    } else { // todo
+      text.setAttribute('font-family', "ui-monospace, Menlo, monospace");
+      if (onDark) {
+        text.setAttribute('fill', n.done ? '#6b6b66' : '#fafaf7');
+      } else if (nMc && !n.done) {
+        text.setAttribute('fill', '#2a2a28');
+      } else {
+        text.setAttribute('fill', n.done ? '#aeaea6' : '#0a0a0a');
+      }
+      if (n.done) text.setAttribute('text-decoration', 'line-through');
+    }
+    if (n.bold) {
+      text.setAttribute('font-weight', '900');
+      // also un-italicize centers when bold so it reads as emphasis not flourish
+      text.setAttribute('font-style', 'normal');
+    }
+    text.textContent = n.bold ? (n.label || '').toUpperCase() : n.label;
+    g.appendChild(text);
+
+    if (n.type === 'todo' && n.done) {
+      const check = document.createElementNS(SVG_NS, 'text');
+      check.setAttribute('x', -dim.w / 2 + 12);
+      check.setAttribute('y', 0);
+      check.setAttribute('font-size', 10);
+      check.setAttribute('fill', onDark ? '#aeaea6' : '#6b6b66');
+      check.setAttribute('text-anchor', 'middle');
+      check.setAttribute('dominant-baseline', 'central');
+      check.textContent = '✓';
+      check.style.pointerEvents = 'none';
+      g.appendChild(check);
+    }
+
+    // Due-date micro node — small pill below the main bubble showing date/time + countdown
+    // Source-map badge — shown only in Locked In to label which map each item came from
+    if (state.lockedIn && n._mapName) {
+      const badge = document.createElementNS(SVG_NS, 'text');
+      badge.setAttribute('text-anchor', 'end');
+      badge.setAttribute('dominant-baseline', 'central');
+      badge.setAttribute('font-family', "ui-monospace, Menlo, monospace");
+      badge.setAttribute('font-size', '10');
+      badge.setAttribute('letter-spacing', '0.06em');
+      badge.setAttribute('fill', '#6b6b66');
+      badge.setAttribute('x', -dim.w / 2 - 16);
+      badge.setAttribute('y', 0);
+      badge.style.pointerEvents = 'none';
+      badge.textContent = n._mapName.toUpperCase();
+      g.appendChild(badge);
+    }
+
+    if (n.dueDate) {
+      const overdue = isOverdue(n.dueDate);
+      const dateText = formatDueDate(n.dueDate);
+      const cdText = formatCountdown(n.dueDate);
+
+      // Measure both lines so the micro pill auto-sizes to its widest line
+      const dateFont = "10px ui-monospace, Menlo, monospace";
+      const cdFont = "600 11px ui-monospace, Menlo, monospace";
+      const dateW = measureText(dateText, dateFont);
+      const cdW = measureText(cdText, cdFont);
+      const microW = Math.max(60, Math.ceil(Math.max(dateW, cdW)) + 18);
+      const microH = 32;
+      const microY = dim.h / 2 + 28; // below the bubble with breathing room
+      const microRx = microH / 2;
+
+      // Connecting hairline from bubble bottom edge to micro top
+      const link = document.createElementNS(SVG_NS, 'line');
+      link.setAttribute('x1', 0);
+      link.setAttribute('y1', dim.h / 2);
+      link.setAttribute('x2', 0);
+      link.setAttribute('y2', microY - microH / 2);
+      link.setAttribute('stroke', overdue ? '#c73c2e' : 'rgba(10,10,10,0.3)');
+      link.setAttribute('stroke-width', '0.75');
+      link.style.pointerEvents = 'none';
+      g.appendChild(link);
+
+      // Micro pill background
+      const microRect = document.createElementNS(SVG_NS, 'rect');
+      microRect.setAttribute('x', -microW / 2);
+      microRect.setAttribute('y', microY - microH / 2);
+      microRect.setAttribute('width', microW);
+      microRect.setAttribute('height', microH);
+      microRect.setAttribute('rx', microRx);
+      microRect.setAttribute('ry', microRx);
+      microRect.setAttribute('fill', overdue ? '#c73c2e' : '#fafaf7');
+      microRect.setAttribute('stroke', '#c73c2e');
+      microRect.setAttribute('stroke-width', '1');
+      microRect.style.pointerEvents = 'none';
+      g.appendChild(microRect);
+
+      // Date/time line (top)
+      const microDate = document.createElementNS(SVG_NS, 'text');
+      microDate.setAttribute('text-anchor', 'middle');
+      microDate.setAttribute('dominant-baseline', 'central');
+      microDate.setAttribute('font-family', "ui-monospace, Menlo, monospace");
+      microDate.setAttribute('font-size', '9');
+      microDate.setAttribute('fill', overdue ? '#fafaf7' : '#6b6b66');
+      microDate.setAttribute('x', 0);
+      microDate.setAttribute('y', microY - 7);
+      microDate.style.pointerEvents = 'none';
+      microDate.textContent = dateText;
+      g.appendChild(microDate);
+
+      // Countdown line (bottom) — bolder/larger
+      const microCd = document.createElementNS(SVG_NS, 'text');
+      microCd.setAttribute('text-anchor', 'middle');
+      microCd.setAttribute('dominant-baseline', 'central');
+      microCd.setAttribute('font-family', "ui-monospace, Menlo, monospace");
+      microCd.setAttribute('font-size', '11');
+      microCd.setAttribute('font-weight', '600');
+      microCd.setAttribute('fill', overdue ? '#fafaf7' : '#c73c2e');
+      microCd.setAttribute('x', 0);
+      microCd.setAttribute('y', microY + 6);
+      microCd.style.pointerEvents = 'none';
+      microCd.textContent = cdText;
+      // Mark for live updates
+      microCd.setAttribute('data-countdown-for', n.id);
+      g.appendChild(microCd);
+    }
+
+    nodesG.appendChild(g);
+  });
+
+  if (state.selectedId) {
+    const selNode = state.doc.nodes.find(n => n.id === state.selectedId);
+    if (selNode) {
+      const datePart = selNode.dueDate ? ` · due ${formatDueDate(selNode.dueDate)}` : '';
+      statusEl.textContent = (selNode.label || 'none') + datePart;
+    } else {
+      statusEl.textContent = 'none';
+    }
+  } else {
+    statusEl.textContent = 'none';
+  }
+
+  const sel = state.selectedId;
+  const bp = state.bigPicture;
+  const li = state.lockedIn;
+  const isCenterSel = !sel ? false : ((bp || li) ? sel.endsWith('__center') : sel === 'center');
+
+  if (li) {
+    // Locked In: read-only-ish, no adding
+    document.getElementById('addProject').disabled = true;
+    document.getElementById('addTodo').disabled = true;
+  } else if (bp) {
+    // In big-picture: + Project requires a center selected (so we know which map to add to)
+    document.getElementById('addProject').disabled = !isCenterSel;
+    // + To-do requires any non-center node selected (we add a child to it in its source map)
+    document.getElementById('addTodo').disabled = !sel || isCenterSel;
+  } else {
+    document.getElementById('addProject').disabled = false;
+    document.getElementById('addTodo').disabled = !sel;
+  }
+  document.getElementById('editNode').disabled = !sel;
+  // Focus map works in both Big Picture and Locked In (source-aware modes)
+  document.getElementById('focusMap').disabled = (!bp && !li) || !sel;
+  document.getElementById('deleteNode').disabled = !sel || isCenterSel;
+  document.getElementById('undoBtn').disabled = undoStack.length === 0;
+  document.getElementById('redoBtn').disabled = redoStack.length === 0;
+
+  updateFloatActions();
+  updateMultiBar();
+}
+
+// ============================================================
+// Pointer / gesture
+// ============================================================
+const activePointers = new Map();
+function svgPoint(cx, cy) {
+  const pt = svg.createSVGPoint();
+  pt.x = cx; pt.y = cy;
+  const ctm = svg.getScreenCTM().inverse();
+  const p = pt.matrixTransform(ctm);
+  return { x: (p.x - state.panX) / state.zoom, y: (p.y - state.panY) / state.zoom };
+}
+
+svg.addEventListener('pointerdown', (e) => {
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (activePointers.size === 2) {
+    state.drag = null;
+    const pts = Array.from(activePointers.values());
+    const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    const cx = (pts[0].x + pts[1].x) / 2;
+    const cy = (pts[0].y + pts[1].y) / 2;
+    state.pinch = { startDist: dist, startZoom: state.zoom, cx, cy };
+    return;
+  }
+
+  const target = e.target.closest('g[data-id]');
+  const marqueeKey = e.metaKey || e.ctrlKey;
+
+  if (!target && marqueeKey && !state.lockedIn) {
+    // Start marquee selection — clear any prior multi-selection
+    const p = svgPoint(e.clientX, e.clientY);
+    state.marquee = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+    state.multiSelected = null;
+    state.selectedId = null;
+    render();
+    svg.setPointerCapture(e.pointerId);
+    return;
+  }
+
+  if (target) {
+    const id = target.getAttribute('data-id');
+    const inMulti = state.multiSelected && state.multiSelected.has(id);
+
+    if (inMulti) {
+      // Group drag — capture starting positions of every selected node
+      const node = state.doc.nodes.find(n => n.id === id);
+      const p = svgPoint(e.clientX, e.clientY);
+      const groupStart = new Map();
+      state.multiSelected.forEach(sid => {
+        const sn = state.doc.nodes.find(n => n.id === sid);
+        if (sn) groupStart.set(sid, { x: sn.x, y: sn.y });
+      });
+      state.drag = {
+        type: 'group',
+        anchorId: id,
+        anchorStartX: node.x,
+        anchorStartY: node.y,
+        offX: p.x - node.x,
+        offY: p.y - node.y,
+        groupStart,
+        startX: e.clientX,
+        startY: e.clientY,
+        moved: false
+      };
+    } else {
+      if (state.selectedId !== id) { state.selectedId = id; render(); }
+      // Tapping outside the multi-selection clears it
+      if (state.multiSelected) { state.multiSelected = null; render(); }
+      const node = state.doc.nodes.find(n => n.id === id);
+      const p = svgPoint(e.clientX, e.clientY);
+      // In Locked In mode, drag is disabled — just register a tap for double-tap detection
+      if (state.lockedIn) {
+        state.drag = { type: 'tap', id, startX: e.clientX, startY: e.clientY, moved: false };
+      } else {
+        state.drag = { type: 'node', id, offX: p.x - node.x, offY: p.y - node.y, startX: e.clientX, startY: e.clientY, moved: false };
+        // Set up long-press → reparent mode (only for non-center nodes; centers can't be reparented)
+        const isCenter = node.type === 'center' || (state.bigPicture && id.endsWith('__center'));
+        if (!isCenter) {
+          state.drag.longPressTimer = setTimeout(() => {
+            // Only convert if user hasn't started dragging yet
+            if (state.drag && state.drag.id === id && !state.drag.moved) {
+              state.drag.type = 'reparent';
+              state.drag.longPressTimer = null;
+              render();
+              // Haptic-style feedback via toast
+              toast('Move to new parent');
+            }
+          }, 500);
+        }
+      }
+    }
+  } else {
+    // Empty space tap clears multi-selection
+    if (state.multiSelected) { state.multiSelected = null; render(); }
+    state.drag = { type: 'pan', startX: e.clientX, startY: e.clientY, startPanX: state.panX, startPanY: state.panY };
+    wrap.classList.add('grabbing');
+  }
+  svg.setPointerCapture(e.pointerId);
+});
+
+svg.addEventListener('pointermove', (e) => {
+  if (activePointers.has(e.pointerId)) activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (state.marquee) {
+    const p = svgPoint(e.clientX, e.clientY);
+    state.marquee.x1 = p.x;
+    state.marquee.y1 = p.y;
+    drawMarquee();
+    return;
+  }
+
+  if (state.pinch && activePointers.size === 2) {
+    const pts = Array.from(activePointers.values());
+    const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    const newZoom = clamp(state.pinch.startZoom * (dist / state.pinch.startDist), MIN_ZOOM, MAX_ZOOM);
+    const rect = svg.getBoundingClientRect();
+    const mx = state.pinch.cx - rect.left;
+    const my = state.pinch.cy - rect.top;
+    const ratio = newZoom / state.zoom;
+    state.panX = mx - (mx - state.panX) * ratio;
+    state.panY = my - (my - state.panY) * ratio;
+    state.zoom = newZoom;
+    applyTransform();
+    return;
+  }
+
+  if (!state.drag) return;
+  if (state.drag.type === 'node') {
+    const dx = Math.abs(e.clientX - state.drag.startX);
+    const dy = Math.abs(e.clientY - state.drag.startY);
+    if (!state.drag.moved && (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD)) {
+      state.drag.moved = true;
+      // Cancel long-press timer — user is dragging, not holding
+      if (state.drag.longPressTimer) {
+        clearTimeout(state.drag.longPressTimer);
+        state.drag.longPressTimer = null;
+      }
+      pushUndo();
+    }
+    if (state.drag.moved) {
+      const p = svgPoint(e.clientX, e.clientY);
+      const node = state.doc.nodes.find(n => n.id === state.drag.id);
+      node.x = p.x - state.drag.offX;
+      node.y = p.y - state.drag.offY;
+      // In big-picture mode, also update the source node's x/y (subtract cluster offset)
+      if (state.bigPicture && node._sourceMapId) {
+        syncBigPictureNodePosition(node);
+      }
+      render();
+      scheduleSave();
+    }
+  } else if (state.drag.type === 'reparent') {
+    // Move the node visually, find the closest valid parent under cursor
+    const p = svgPoint(e.clientX, e.clientY);
+    const node = state.doc.nodes.find(n => n.id === state.drag.id);
+    if (!state.drag.startNodeX) {
+      state.drag.startNodeX = node.x;
+      state.drag.startNodeY = node.y;
+    }
+    node.x = p.x - state.drag.offX;
+    node.y = p.y - state.drag.offY;
+    // Find the nearest valid parent target. Skip self and descendants (would cycle).
+    state.drag.hoverTargetId = findReparentTarget(node, p.x, p.y);
+    render();
+    // Don't persist during reparent drag — only on commit
+  } else if (state.drag.type === 'group') {
+    const dxs = Math.abs(e.clientX - state.drag.startX);
+    const dys = Math.abs(e.clientY - state.drag.startY);
+    if (!state.drag.moved && (dxs > DRAG_THRESHOLD || dys > DRAG_THRESHOLD)) {
+      state.drag.moved = true;
+      pushUndo();
+    }
+    if (state.drag.moved) {
+      // Compute delta from anchor's start to current pointer (in world coords)
+      const p = svgPoint(e.clientX, e.clientY);
+      const newAnchorX = p.x - state.drag.offX;
+      const newAnchorY = p.y - state.drag.offY;
+      const dxw = newAnchorX - state.drag.anchorStartX;
+      const dyw = newAnchorY - state.drag.anchorStartY;
+      // Apply delta to every selected node from its captured start position
+      state.drag.groupStart.forEach((start, sid) => {
+        const sn = state.doc.nodes.find(n => n.id === sid);
+        if (!sn) return;
+        sn.x = start.x + dxw;
+        sn.y = start.y + dyw;
+        if (state.bigPicture && sn._sourceMapId) {
+          syncBigPictureNodePosition(sn);
+        }
+      });
+      render();
+      scheduleSave();
+    }
+  } else if (state.drag.type === 'pan') {
+    state.panX = state.drag.startPanX + (e.clientX - state.drag.startX);
+    state.panY = state.drag.startPanY + (e.clientY - state.drag.startY);
+    applyTransform();
+  }
+});
+
+function endPointer(e) {
+  activePointers.delete(e.pointerId);
+  if (activePointers.size < 2) state.pinch = null;
+  if (state.drag && state.drag.type === 'pan') wrap.classList.remove('grabbing');
+
+  // Cancel any pending long-press timer
+  if (state.drag && state.drag.longPressTimer) {
+    clearTimeout(state.drag.longPressTimer);
+    state.drag.longPressTimer = null;
+  }
+
+  // Reparent commit / revert
+  if (state.drag && state.drag.type === 'reparent') {
+    const draggedId = state.drag.id;
+    const targetId = state.drag.hoverTargetId;
+    const startX = state.drag.startNodeX;
+    const startY = state.drag.startNodeY;
+    const dragged = state.doc.nodes.find(n => n.id === draggedId);
+    // Clear drag state FIRST so render after this doesn't apply dim treatment
+    state.drag = null;
+
+    if (targetId && dragged && targetId !== dragged.parent) {
+      // Commit reparent
+      pushUndo();
+      const newParentId = targetId;
+      // Resolve source nodes for big-picture write-through
+      const target = state.doc.nodes.find(n => n.id === targetId);
+      dragged.parent = newParentId;
+      // Clear color override so node inherits the new arm's color naturally.
+      // Recursively clear children too — if you move a project arm, its to-dos
+      // should re-tint to the new parent's color, not stay locked to the old one.
+      clearColorOverridesRecursive(draggedId);
+      // Snap dragged node to a sensible position relative to new parent
+      const radius = dragged.type === 'family' ? 220 : (dragged.type === 'project' ? 320 : 150);
+      const childCount = state.doc.nodes.filter(n => n.parent === newParentId && n.id !== draggedId).length;
+      const baseAngle = -Math.PI / 2 + (childCount * 0.55);
+      dragged.x = target.x + Math.cos(baseAngle) * radius;
+      dragged.y = target.y + Math.sin(baseAngle) * radius;
+      // Big-picture: also write through to source nodes
+      if (state.bigPicture && dragged._sourceMapId && target._sourceMapId === dragged._sourceMapId) {
+        const map = state.maps.find(m => m.id === dragged._sourceMapId);
+        const srcDragged = map?.nodes.find(s => s.id === dragged._sourceId);
+        const srcTarget = map?.nodes.find(s => s.id === target._sourceId);
+        if (srcDragged && srcTarget) {
+          srcDragged.parent = srcTarget.id;
+          srcDragged.x = srcTarget.x + Math.cos(baseAngle) * radius;
+          srcDragged.y = srcTarget.y + Math.sin(baseAngle) * radius;
+          // Mirror the color clear into the source map too
+          delete srcDragged.color;
+          // Recursively clear in source
+          const srcDescendants = collectDescendantsInMap(map, srcDragged.id);
+          srcDescendants.forEach(id => {
+            const sn = map.nodes.find(x => x.id === id);
+            if (sn) delete sn.color;
+          });
+        }
+      }
+      toast('Moved to ' + (target.label || 'new parent'));
+      render();
+      scheduleSave();
+    } else {
+      // No target — revert position
+      if (dragged && startX !== undefined) {
+        dragged.x = startX;
+        dragged.y = startY;
+        if (state.bigPicture && dragged._sourceMapId) {
+          syncBigPictureNodePosition(dragged);
+        }
+      }
+      render();
+    }
+  }
+
+  // Double-tap detection — when a node tap ends without movement, check for a recent prior tap on same node
+  if (state.drag && (state.drag.type === 'node' || state.drag.type === 'tap') && !state.drag.moved) {
+    const now = performance.now();
+    const tappedId = state.drag.id;
+    if (state.lastTap && state.lastTap.id === tappedId && (now - state.lastTap.t) < 350) {
+      state.lastTap = null;
+      // Defer to next tick so the selection render flushes first
+      setTimeout(() => openEdit(tappedId), 0);
+    } else {
+      state.lastTap = { id: tappedId, t: now };
+    }
+  }
+
+  state.drag = null;
+
+  if (state.marquee) {
+    finalizeMarquee();
+    state.marquee = null;
+    clearMarqueeRect();
+  }
+}
+
+function drawMarquee() {
+  const layer = document.getElementById('marqueeLayer');
+  if (!layer || !state.marquee) return;
+  const m = state.marquee;
+  const x = Math.min(m.x0, m.x1);
+  const y = Math.min(m.y0, m.y1);
+  const w = Math.abs(m.x1 - m.x0);
+  const h = Math.abs(m.y1 - m.y0);
+  // Marquee rect is in WORLD coords — apply current transform so it renders aligned
+  // We render it as a child of the world group instead so it stays correctly placed.
+  layer.innerHTML = '';
+  const g = document.createElementNS(SVG_NS, 'g');
+  g.setAttribute('transform', `translate(${state.panX} ${state.panY}) scale(${state.zoom})`);
+  const r = document.createElementNS(SVG_NS, 'rect');
+  r.setAttribute('class', 'marquee-rect');
+  r.setAttribute('x', x);
+  r.setAttribute('y', y);
+  r.setAttribute('width', w);
+  r.setAttribute('height', h);
+  g.appendChild(r);
+  layer.appendChild(g);
+}
+
+function clearMarqueeRect() {
+  const layer = document.getElementById('marqueeLayer');
+  if (layer) layer.innerHTML = '';
+}
+
+function finalizeMarquee() {
+  const m = state.marquee;
+  if (!m) return;
+  const minX = Math.min(m.x0, m.x1);
+  const maxX = Math.max(m.x0, m.x1);
+  const minY = Math.min(m.y0, m.y1);
+  const maxY = Math.max(m.y0, m.y1);
+  // Tiny rectangles (clicks with modifier) — ignore
+  if ((maxX - minX) < 5 && (maxY - minY) < 5) return;
+  const set = new Set();
+  state.doc.nodes.forEach(n => {
+    if (n.x >= minX && n.x <= maxX && n.y >= minY && n.y <= maxY) {
+      set.add(n.id);
+    }
+  });
+  if (set.size > 0) {
+    state.multiSelected = set;
+    state.selectedId = null;
+  }
+  render();
+}
+
+svg.addEventListener('pointerup', endPointer);
+svg.addEventListener('pointercancel', endPointer);
+
+svg.addEventListener('dblclick', (e) => {
+  const target = e.target.closest('g[data-id]');
+  if (!target) return;
+  state.selectedId = target.getAttribute('data-id');
+  render();
+  openEdit(state.selectedId);
+});
+
+wrap.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = svg.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const delta = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  const newZoom = clamp(state.zoom * delta, MIN_ZOOM, MAX_ZOOM);
+  const ratio = newZoom / state.zoom;
+  state.panX = mx - (mx - state.panX) * ratio;
+  state.panY = my - (my - state.panY) * ratio;
+  state.zoom = newZoom;
+  applyTransform();
+}, { passive: false });
+
+// ============================================================
+// Sheet / modal
+// ============================================================
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function openSheet(opts) {
+  return new Promise((resolve) => {
+    const bg = document.createElement('div');
+    bg.className = 'sheet-bg';
+    const extras = opts.extras || [];
+    const showSwatches = !!opts.swatches;
+    let chosenColor = opts.swatches ? (opts.swatches.current || 'none') : null;
+
+    const swatchHtml = showSwatches ? (() => {
+      const wheelRadius = 80; // px from center
+      const dots = WHEEL_HUES.map((hue, i) => {
+        const key = 'h' + hue;
+        const c = COLORS[key];
+        // Start at top (12 o'clock) and go clockwise
+        const angle = (i / WHEEL_HUES.length) * Math.PI * 2 - Math.PI / 2;
+        const x = 100 + Math.cos(angle) * wheelRadius;
+        const y = 100 + Math.sin(angle) * wheelRadius;
+        const cls = 'dot' + (key === chosenColor ? ' selected' : '');
+        return `<button type="button" class="${cls}" data-color="${key}" style="background: ${c.fill}; left: ${x}px; top: ${y}px;" aria-label="hue ${hue}"></button>`;
+      }).join('');
+      const noneCls = 'dot none' + (chosenColor === 'none' ? ' selected' : '');
+      const noneDot = `<button type="button" class="${noneCls}" data-color="none" style="left: 100px; top: 100px;" aria-label="no color"></button>`;
+      return `
+        <div class="color-wheel-wrap">
+          <div class="color-wheel-label">Color</div>
+          <div class="color-wheel">
+            ${dots}
+            ${noneDot}
+          </div>
+        </div>
+      `;
+    })() : '';
+
+    bg.innerHTML = `
+      <div class="sheet" role="dialog">
+        <h3>${escapeHtml(opts.title)}</h3>
+        <div class="sub">${escapeHtml(opts.sub || '')}</div>
+        <input type="text" id="sheetIn" value="${escapeHtml(opts.value || '')}" placeholder="${escapeHtml(opts.placeholder || '')}" />
+        ${swatchHtml}
+        <div class="sheet-actions">
+          <button data-action="cancel">Cancel</button>
+          ${extras.map(b => `<button data-action="${b.action}">${escapeHtml(b.label)}</button>`).join('')}
+          <button class="primary" data-action="save">${escapeHtml(opts.primary || 'Save')}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(bg);
+    const input = bg.querySelector('#sheetIn');
+    setTimeout(() => input.focus(), 50);
+
+    if (showSwatches) {
+      bg.querySelectorAll('.color-wheel .dot').forEach(sw => {
+        sw.addEventListener('click', () => {
+          chosenColor = sw.getAttribute('data-color');
+          bg.querySelectorAll('.color-wheel .dot').forEach(s => s.classList.remove('selected'));
+          sw.classList.add('selected');
+        });
+      });
+    }
+
+    function close(r) {
+      if (r && showSwatches) r.color = chosenColor;
+      bg.remove();
+      resolve(r);
+    }
+    bg.addEventListener('click', e => { if (e.target === bg) close(null); });
+    bg.querySelectorAll('button[data-action]').forEach(b => {
+      b.addEventListener('click', () => {
+        const a = b.getAttribute('data-action');
+        if (a === 'cancel') return close(null);
+        if (a === 'save') {
+          const v = input.value.trim();
+          if (!v) return close(null);
+          return close({ action: 'save', value: v });
+        }
+        close({ action: a, value: input.value.trim() });
+      });
+    });
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const v = input.value.trim();
+        if (v) close({ action: 'save', value: v });
+      } else if (e.key === 'Escape') close(null);
+    });
+  });
+}
+
+// Date-picker sheet — separate from openSheet because the structure is different.
+// Resolves with { action: 'save', value: 'YYYY-MM-DD' } or { action: 'clear' } or null.
+function openDateSheet(opts) {
+  return new Promise((resolve) => {
+    const bg = document.createElement('div');
+    bg.className = 'sheet-bg';
+    const initial = opts.value || '';
+    // Split combined value into date and time. If only a date is stored (legacy),
+    // default the time to 17:00.
+    let initialDate = '', initialTime = '17:00';
+    if (initial) {
+      const parts = initial.split('T');
+      initialDate = parts[0] || '';
+      if (parts[1]) initialTime = parts[1].slice(0, 5);
+    }
+    bg.innerHTML = `
+      <div class="sheet" role="dialog">
+        <h3>${escapeHtml(opts.title || 'Due date')}</h3>
+        <div class="sub">${escapeHtml(opts.sub || '')}</div>
+        <div class="date-row">
+          <div class="date-field">
+            <label class="date-label">Date</label>
+            <input type="date" id="dateIn" value="${escapeHtml(initialDate)}" />
+          </div>
+          <div class="date-field">
+            <label class="date-label">Time</label>
+            <input type="time" id="timeIn" value="${escapeHtml(initialTime)}" />
+          </div>
+        </div>
+        <div class="sheet-actions">
+          <button data-action="cancel">Cancel</button>
+          ${initial ? '<button data-action="clear">Clear date</button>' : ''}
+          <button class="primary" data-action="save">Save</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(bg);
+    const dateInput = bg.querySelector('#dateIn');
+    const timeInput = bg.querySelector('#timeIn');
+    setTimeout(() => { try { dateInput.focus(); dateInput.showPicker?.(); } catch {} }, 50);
+
+    function close(r) { bg.remove(); resolve(r); }
+    bg.addEventListener('click', e => { if (e.target === bg) close(null); });
+    bg.querySelectorAll('button[data-action]').forEach(b => {
+      b.addEventListener('click', () => {
+        const a = b.getAttribute('data-action');
+        if (a === 'cancel') return close(null);
+        if (a === 'clear') return close({ action: 'clear' });
+        if (a === 'save') {
+          const d = dateInput.value;
+          if (!d) return close({ action: 'clear' });
+          const t = timeInput.value || '17:00';
+          return close({ action: 'save', value: d + 'T' + t });
+        }
+      });
+    });
+  });
+}
+
+// Parse a stored due date string ('YYYY-MM-DD' legacy or 'YYYY-MM-DDTHH:MM') to a Date object.
+// Parses as LOCAL time (not UTC) — Safari otherwise interprets bare ISO strings without
+// a Z or offset as UTC, which made "today" times land in the past.
+function parseDueDate(stored) {
+  if (!stored) return null;
+  const parts = stored.split('T');
+  const dateStr = parts[0];
+  const timeStr = parts[1] || '17:00';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const [hh, mm] = timeStr.split(':').map(Number);
+  if (!y || !m || !d) return null;
+  const local = new Date(y, m - 1, d, hh || 0, mm || 0, 0, 0);
+  return isNaN(local.getTime()) ? null : local;
+}
+
+// Format the due date for display in the micro node and status pill.
+// Examples: "Nov 12 · 5p", "Today · 9:30a", "Tomorrow · 5p"
+function formatDueDate(stored) {
+  const d = parseDueDate(stored);
+  if (!d) return '';
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const tomorrow = new Date(now); tomorrow.setDate(now.getDate() + 1);
+  const isTomorrow = d.toDateString() === tomorrow.toDateString();
+
+  let datePart;
+  if (sameDay) datePart = 'Today';
+  else if (isTomorrow) datePart = 'Tomorrow';
+  else if (d.getFullYear() === now.getFullYear()) datePart = `${months[d.getMonth()]} ${d.getDate()}`;
+  else datePart = `${months[d.getMonth()]} ${d.getDate()} '${String(d.getFullYear()).slice(2)}`;
+
+  // Time: only include if not midnight (which is a sloppy default the user didn't pick)
+  let timePart = '';
+  const h = d.getHours();
+  const m = d.getMinutes();
+  if (!(h === 0 && m === 0)) {
+    const period = h >= 12 ? 'p' : 'a';
+    const displayH = h % 12 === 0 ? 12 : h % 12;
+    timePart = m === 0 ? `${displayH}${period}` : `${displayH}:${String(m).padStart(2, '0')}${period}`;
+  }
+  return timePart ? `${datePart} · ${timePart}` : datePart;
+}
+
+// Format the countdown to a due date with all four units, zero-padded.
+// Always renders as "DDd HHh MMm SSs" so the layout never shifts.
+// Past-due flips to a leading minus.
+function formatCountdown(stored) {
+  const d = parseDueDate(stored);
+  if (!d) return '';
+  const now = new Date();
+  let ms = d.getTime() - now.getTime();
+  const overdue = ms < 0;
+  ms = Math.abs(ms);
+  const totalSec = Math.floor(ms / 1000);
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  const sign = overdue ? '−' : '';
+  return `${sign}${pad(days)}d ${pad(hours)}h ${pad(mins)}m ${pad(secs)}s`;
+}
+
+// True when the due date is within the next 24 hours or already past
+function isImminentOrOverdue(stored) {
+  const d = parseDueDate(stored);
+  if (!d) return false;
+  const ms = d.getTime() - Date.now();
+  return ms < (24 * 60 * 60 * 1000);
+}
+
+function isOverdue(stored) {
+  const d = parseDueDate(stored);
+  if (!d) return false;
+  return d.getTime() < Date.now();
+}
+
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 1800);
+}
+
+function openEdit(id) {
+  const node = state.doc.nodes.find(n => n.id === id);
+  if (!node) return;
+  const extras = node.type === 'todo' ? [{ label: node.done ? 'Reopen' : 'Mark done', action: 'toggle' }] : [];
+
+  // Show color wheel for centers and projects — they're the "color owners" in the tree.
+  // To-dos and family-anchors inherit; no per-node override on those.
+  const showColor = node.type === 'center' || node.type === 'project';
+
+  const sheetOpts = {
+    title: 'Edit', sub: node.type, value: node.label,
+    placeholder: 'Label', primary: 'Save', extras
+  };
+  if (showColor) {
+    // Show what's actually overridden on this node — 'none' means "no override / inherit"
+    // For center nodes that haven't been individually colored, show the map's color as the starting point.
+    let currentKey;
+    if (node.color) {
+      currentKey = node.color;
+    } else if (node.type === 'center') {
+      // Centers default-display the map's color so the wheel reflects what they're showing
+      currentKey = state.bigPicture ? (node._mapColor || 'none') : (state.doc.color || 'none');
+    } else {
+      currentKey = 'none';
+    }
+    sheetOpts.swatches = { current: currentKey };
+  }
+
+  openSheet(sheetOpts).then(r => {
+    if (!r) return;
+    const src = state.bigPicture && node._sourceMapId
+      ? state.maps.find(m => m.id === node._sourceMapId)?.nodes.find(s => s.id === node._sourceId)
+      : null;
+
+    if (r.action === 'save') {
+      pushUndo();
+      node.label = r.value;
+      if (src) src.label = r.value;
+      if (showColor && r.color !== undefined) {
+        node.color = r.color;
+        if (src) src.color = r.color;
+      }
+      render();
+      scheduleSave();
+    }
+    else if (r.action === 'toggle') {
+      pushUndo();
+      if (r.value && r.value !== node.label) {
+        node.label = r.value;
+        if (src) src.label = r.value;
+      }
+      node.done = !node.done;
+      if (src) src.done = node.done;
+      render();
+      scheduleSave();
+    }
+  });
+}
+
+// ============================================================
+// Persistence
+// ============================================================
+function scheduleSave() {
+  if (state.saveTimer) clearTimeout(state.saveTimer);
+  state.saveTimer = setTimeout(persist, SAVE_DEBOUNCE_MS);
+}
+async function persist() {
+  if (state.bigPicture) {
+    // Save every real map — drag/edit in big-picture writes through to sources.
+    const now = Date.now();
+    for (const m of state.maps) {
+      m.updatedAt = now;
+      await saveMap(m);
+    }
+    return;
+  }
+  state.doc.updatedAt = Date.now();
+  await saveMap(state.doc);
+}
+
+// ============================================================
+// Buttons
+// ============================================================
+document.getElementById('zoomIn').onclick = () => { state.zoom = clamp(state.zoom * 1.2, MIN_ZOOM, MAX_ZOOM); applyTransform(); };
+document.getElementById('zoomOut').onclick = () => { state.zoom = clamp(state.zoom / 1.2, MIN_ZOOM, MAX_ZOOM); applyTransform(); };
+document.getElementById('zoomReset').onclick = () => { centerOnCenter(); };
+
+document.getElementById('undoBtn').onclick = () => undo();
+document.getElementById('redoBtn').onclick = () => redo();
+
+document.getElementById('addProject').onclick = async () => {
+  // In big-picture, addProject only enabled when a center is selected.
+  // We add to the source map of that center.
+  let targetMap, targetCenter;
+  if (state.bigPicture) {
+    if (!state.selectedId || !state.selectedId.endsWith('__center')) {
+      toast('Select a center first');
+      return;
+    }
+    const synth = state.doc.nodes.find(n => n.id === state.selectedId);
+    targetMap = state.maps.find(m => m.id === synth._sourceMapId);
+    if (!targetMap) return;
+    targetCenter = targetMap.nodes.find(n => n.id === 'center');
+  } else {
+    targetMap = state.doc;
+    targetCenter = state.doc.nodes.find(n => n.id === 'center');
+  }
+
+  const r = await openSheet({ title: 'New project', sub: `arm off ${targetMap.name}`, placeholder: 'e.g. Documentary', primary: 'Add' });
+  if (!r) return;
+  pushUndo();
+
+  const existing = targetMap.nodes.filter(n => n.type === 'project' && n.parent === 'center');
+  const angle = (existing.length / Math.max(6, existing.length + 1)) * Math.PI * 2 - Math.PI / 2;
+  const id = nid();
+  const newSrc = {
+    id, label: r.value, type: 'project',
+    x: targetCenter.x + Math.cos(angle) * 320,
+    y: targetCenter.y + Math.sin(angle) * 320,
+    parent: 'center'
+  };
+  targetMap.nodes.push(newSrc);
+
+  if (state.bigPicture) {
+    // Rebuild synthetic doc to include the new node
+    state.doc = buildBigPictureDoc();
+    state.selectedId = targetMap.id + '__' + id;
+  } else {
+    state.selectedId = id;
+  }
+  render();
+  scheduleSave();
+};
+
+document.getElementById('addTodo').onclick = async () => {
+  if (!state.selectedId) { toast('Select something first'); return; }
+  const synthOrSrc = state.doc.nodes.find(n => n.id === state.selectedId);
+  if (!synthOrSrc) return;
+
+  // Resolve target map + parent node in source space
+  let targetMap, parentSrc;
+  if (state.bigPicture) {
+    targetMap = state.maps.find(m => m.id === synthOrSrc._sourceMapId);
+    if (!targetMap) return;
+    parentSrc = targetMap.nodes.find(n => n.id === synthOrSrc._sourceId);
+  } else {
+    targetMap = state.doc;
+    parentSrc = synthOrSrc;
+  }
+  if (!parentSrc) return;
+
+  const isFromCenter = parentSrc.id === 'center';
+  const anchorMap = !targetMap.color || targetMap.color === 'none';
+  const childType = (isFromCenter && anchorMap) ? 'family' : 'todo';
+  const sub = (isFromCenter && anchorMap)
+    ? `anchor under ${targetMap.name}`
+    : `under ${parentSrc.label}${state.bigPicture ? ' · ' + targetMap.name : ''}`;
+  const placeholder = (isFromCenter && anchorMap) ? 'e.g. Kids, House, Wife' : 'next action';
+  const title = (isFromCenter && anchorMap) ? 'New anchor' : 'New to-do';
+
+  if (isFromCenter && !anchorMap) {
+    toast('Use + Project for the first ring');
+    return;
+  }
+
+  const r = await openSheet({ title, sub, placeholder, primary: 'Add' });
+  if (!r) return;
+  pushUndo();
+
+  const grandparentSrc = parentSrc.parent ? targetMap.nodes.find(n => n.id === parentSrc.parent) : null;
+  let baseAngle = grandparentSrc
+    ? Math.atan2(parentSrc.y - grandparentSrc.y, parentSrc.x - grandparentSrc.x)
+    : -Math.PI / 2;
+  const childCount = targetMap.nodes.filter(n => n.parent === parentSrc.id).length;
+  const spread = (childCount % 2 === 0 ? 1 : -1) * Math.ceil(childCount / 2) * 0.45;
+  const angle = baseAngle + spread;
+  const radius = childType === 'family' ? 220 : 150;
+  const id = nid();
+  const newSrc = {
+    id, label: r.value, type: childType,
+    x: parentSrc.x + Math.cos(angle) * radius,
+    y: parentSrc.y + Math.sin(angle) * radius,
+    parent: parentSrc.id
+  };
+  if (childType === 'todo') newSrc.done = false;
+  targetMap.nodes.push(newSrc);
+
+  if (state.bigPicture) {
+    state.doc = buildBigPictureDoc();
+    state.selectedId = targetMap.id + '__' + id;
+  } else {
+    state.selectedId = id;
+  }
+  render();
+  scheduleSave();
+};
+
+document.getElementById('editNode').onclick = () => {
+  if (state.selectedId) openEdit(state.selectedId);
+};
+
+// ============================================================
+// Helpers for priority toggle + instant delete (sync to source in big-picture)
+// ============================================================
+
+// Get { node, src } where src is the source-map node when in big-picture, else the same as node
+function resolveNodeAndSource(synthOrSrc) {
+  if (state.bigPicture && synthOrSrc._sourceMapId) {
+    const map = state.maps.find(m => m.id === synthOrSrc._sourceMapId);
+    const src = map?.nodes.find(s => s.id === synthOrSrc._sourceId);
+    return { node: synthOrSrc, src };
+  }
+  return { node: synthOrSrc, src: synthOrSrc };
+}
+
+function togglePriority(id) {
+  const node = state.doc.nodes.find(n => n.id === id);
+  if (!node) return;
+  pushUndo();
+  const { src } = resolveNodeAndSource(node);
+  const newVal = !node.priority;
+  node.priority = newVal;
+  if (src && src !== node) src.priority = newVal;
+  render();
+  scheduleSave();
+}
+
+// Set bold on a specific node (writes through to source in big-picture)
+function setBold(id, val) {
+  const node = state.doc.nodes.find(n => n.id === id);
+  if (!node) return;
+  const { src } = resolveNodeAndSource(node);
+  node.bold = val;
+  if (src && src !== node) src.bold = val;
+}
+
+// Toggle bold on the current selection (single or multi).
+// For multi: if any are not-bold turn all on, otherwise turn all off.
+function toggleBoldOnSelection() {
+  if (state.multiSelected && state.multiSelected.size > 0) {
+    pushUndo();
+    const ids = Array.from(state.multiSelected);
+    const anyOff = ids.some(id => {
+      const n = state.doc.nodes.find(x => x.id === id);
+      return n && !n.bold;
+    });
+    ids.forEach(id => setBold(id, anyOff));
+    render();
+    scheduleSave();
+    toast(anyOff ? 'Bold on' : 'Bold off');
+    return;
+  }
+  if (state.selectedId) {
+    pushUndo();
+    const node = state.doc.nodes.find(n => n.id === state.selectedId);
+    if (!node) return;
+    setBold(state.selectedId, !node.bold);
+    render();
+    scheduleSave();
+  }
+}
+
+// Build the descendant set for a given id within state.doc
+function descendantSet(id) {
+  const set = new Set([id]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    state.doc.nodes.forEach(n => {
+      if (n.parent && set.has(n.parent) && !set.has(n.id)) { set.add(n.id); changed = true; }
+    });
+  }
+  return set;
+}
+
+// Delete a single node + its descendants. In big-picture, mirror the deletion to source maps.
+function deleteNodeImmediate(id) {
+  const isCenter = state.bigPicture ? id.endsWith('__center') : id === 'center';
+  if (isCenter) { toast('Cannot delete center'); return; }
+  pushUndo();
+  const set = descendantSet(id);
+  if (state.bigPicture) {
+    const byMap = {};
+    state.doc.nodes.forEach(n => {
+      if (set.has(n.id) && n._sourceMapId) {
+        (byMap[n._sourceMapId] = byMap[n._sourceMapId] || new Set()).add(n._sourceId);
+      }
+    });
+    Object.entries(byMap).forEach(([mapId, srcIds]) => {
+      const m = state.maps.find(x => x.id === mapId);
+      if (m) m.nodes = m.nodes.filter(n => !srcIds.has(n.id));
+    });
+    state.doc.nodes = state.doc.nodes.filter(n => !set.has(n.id));
+  } else {
+    state.doc.nodes = state.doc.nodes.filter(n => !set.has(n.id));
+  }
+  state.selectedId = null;
+  render();
+  scheduleSave();
+}
+
+// ============================================================
+// Float button wiring
+// ============================================================
+document.getElementById('floatPriority').onclick = (e) => {
+  e.stopPropagation();
+  if (!state.selectedId) return;
+  togglePriority(state.selectedId);
+};
+
+document.getElementById('floatDate').onclick = async (e) => {
+  e.stopPropagation();
+  if (!state.selectedId) return;
+  const node = state.doc.nodes.find(n => n.id === state.selectedId);
+  if (!node) return;
+  const r = await openDateSheet({
+    title: 'Due date',
+    sub: node.label,
+    value: node.dueDate || ''
+  });
+  if (!r) return;
+  pushUndo();
+  const { src } = resolveNodeAndSource(node);
+  if (r.action === 'clear') {
+    delete node.dueDate;
+    if (src && src !== node) delete src.dueDate;
+    toast('Date cleared');
+  } else if (r.action === 'save') {
+    node.dueDate = r.value;
+    if (src && src !== node) src.dueDate = r.value;
+    toast('Due ' + formatDueDate(r.value));
+  }
+  render();
+  scheduleSave();
+};
+
+document.getElementById('floatDone').onclick = (e) => {
+  e.stopPropagation();
+  if (!state.selectedId) return;
+  const node = state.doc.nodes.find(n => n.id === state.selectedId);
+  if (!node || node.type !== 'todo') return;
+  pushUndo();
+  const { src } = resolveNodeAndSource(node);
+  node.done = !node.done;
+  if (src && src !== node) src.done = node.done;
+  toast(node.done ? 'Marked done' : 'Marked active');
+  render();
+  scheduleSave();
+};
+
+document.getElementById('floatDelete').onclick = (e) => {
+  e.stopPropagation();
+  if (!state.selectedId) return;
+  const node = state.doc.nodes.find(n => n.id === state.selectedId);
+  if (!node) return;
+  // For to-dos and family-anchors: instant delete (cheap, undo via re-add)
+  // For projects: require confirm because they have children
+  const childCount = descendantSet(state.selectedId).size - 1;
+  if (node.type === 'todo' || (node.type === 'family' && childCount === 0)) {
+    deleteNodeImmediate(state.selectedId);
+    toast('Deleted');
+  } else {
+    // Use the existing confirm flow
+    document.getElementById('deleteNode').click();
+  }
+};
+
+// Multi-select bar handlers
+document.getElementById('multiPriority').onclick = () => {
+  if (!state.multiSelected) return;
+  pushUndo();
+  // If any are not-priority, turn ALL on. Otherwise turn all off.
+  const ids = Array.from(state.multiSelected);
+  const anyOff = ids.some(id => {
+    const n = state.doc.nodes.find(x => x.id === id);
+    return n && !n.priority;
+  });
+  ids.forEach(id => {
+    const n = state.doc.nodes.find(x => x.id === id);
+    if (!n) return;
+    const { src } = resolveNodeAndSource(n);
+    n.priority = anyOff ? true : false;
+    if (src && src !== n) src.priority = n.priority;
+  });
+  render();
+  scheduleSave();
+  toast(anyOff ? 'Priority on' : 'Priority off');
+};
+
+document.getElementById('multiDelete').onclick = () => {
+  if (!state.multiSelected) return;
+  const ids = Array.from(state.multiSelected);
+  // Filter out centers
+  const deletable = ids.filter(id => {
+    const isCenter = state.bigPicture ? id.endsWith('__center') : id === 'center';
+    return !isCenter;
+  });
+  if (deletable.length === 0) {
+    toast('Nothing to delete');
+    return;
+  }
+  pushUndo();
+  // Compute combined descendant set across all selected
+  const combined = new Set();
+  deletable.forEach(id => descendantSet(id).forEach(d => combined.add(d)));
+  if (state.bigPicture) {
+    const byMap = {};
+    state.doc.nodes.forEach(n => {
+      if (combined.has(n.id) && n._sourceMapId) {
+        (byMap[n._sourceMapId] = byMap[n._sourceMapId] || new Set()).add(n._sourceId);
+      }
+    });
+    Object.entries(byMap).forEach(([mapId, srcIds]) => {
+      const m = state.maps.find(x => x.id === mapId);
+      if (m) m.nodes = m.nodes.filter(n => !srcIds.has(n.id));
+    });
+    state.doc.nodes = state.doc.nodes.filter(n => !combined.has(n.id));
+  } else {
+    state.doc.nodes = state.doc.nodes.filter(n => !combined.has(n.id));
+  }
+  toast(`Deleted ${combined.size}`);
+  state.multiSelected = null;
+  state.selectedId = null;
+  render();
+  scheduleSave();
+};
+
+document.getElementById('multiClear').onclick = () => {
+  state.multiSelected = null;
+  render();
+};
+
+document.getElementById('focusMap').onclick = () => {
+  if (!state.bigPicture && !state.lockedIn) return;
+  if (!state.selectedId) return;
+  const synth = state.doc.nodes.find(n => n.id === state.selectedId);
+  if (!synth || !synth._sourceMapId) return;
+  const targetSourceId = synth._sourceId;
+  switchMap(synth._sourceMapId);
+  // After switching, try to select and center on the original node
+  state.selectedId = targetSourceId;
+  const target = state.doc.nodes.find(n => n.id === targetSourceId);
+  if (target) {
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    state.zoom = 1;
+    state.panX = w / 2 - target.x;
+    state.panY = h / 2 - target.y;
+    applyTransform();
+  }
+  render();
+};
+
+document.getElementById('deleteNode').onclick = async () => {
+  if (!state.selectedId) return;
+  const isCenterSel = state.bigPicture
+    ? state.selectedId.endsWith('__center')
+    : state.selectedId === 'center';
+  if (isCenterSel) return;
+
+  const node = state.doc.nodes.find(n => n.id === state.selectedId);
+  // Build delete-set in the active doc (real or synthetic)
+  const set = new Set([state.selectedId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    state.doc.nodes.forEach(n => {
+      if (n.parent && set.has(n.parent) && !set.has(n.id)) { set.add(n.id); changed = true; }
+    });
+  }
+  const childCount = set.size - 1;
+  const sub = childCount > 0 ? `removes ${childCount} attached node${childCount > 1 ? 's' : ''} too` : 'this is permanent';
+  const r = await openSheet({ title: `Delete ${node.label}?`, sub, placeholder: 'type DELETE to confirm', primary: 'Delete' });
+  if (r && r.value && r.value.toUpperCase() === 'DELETE') {
+    pushUndo();
+    if (state.bigPicture) {
+      // Delete from each affected source map
+      const byMap = {};
+      state.doc.nodes.forEach(n => {
+        if (set.has(n.id) && n._sourceMapId) {
+          (byMap[n._sourceMapId] = byMap[n._sourceMapId] || new Set()).add(n._sourceId);
+        }
+      });
+      Object.entries(byMap).forEach(([mapId, srcIds]) => {
+        const m = state.maps.find(x => x.id === mapId);
+        if (m) m.nodes = m.nodes.filter(n => !srcIds.has(n.id));
+      });
+      state.doc.nodes = state.doc.nodes.filter(n => !set.has(n.id));
+    } else {
+      state.doc.nodes = state.doc.nodes.filter(n => !set.has(n.id));
+    }
+    state.selectedId = null;
+    render();
+    scheduleSave();
+    toast('Deleted');
+  } else if (r) {
+    toast('Type DELETE to confirm');
+  }
+};
+
+document.getElementById('mapName').onclick = async () => {
+  await openMapSwitcher();
+};
+
+// Map switcher sheet — list of all maps + actions for current map
+function openMapSwitcher() {
+  return new Promise((resolve) => {
+    const bg = document.createElement('div');
+    bg.className = 'sheet-bg';
+
+    // Default to grid view ("all in one place")
+    let view = 'grid';
+
+    function dotColor(m) {
+      return m.color === 'none' ? '#0a0a0a' : (COLORS[m.color]?.fill || '#0a0a0a');
+    }
+
+    function renderListHtml() {
+      const bpActive = state.bigPicture;
+      const liActive = state.lockedIn;
+      // Count locked-in items for the label
+      const lockedCount = state.maps.reduce((sum, m) =>
+        sum + m.nodes.filter(n => n.priority || n.dueDate).length, 0);
+      const bpItem = `
+        <button type="button" class="map-item bp-item${bpActive ? ' active' : ''}" data-map-id="${ALL_MAP_ID}">
+          <span class="map-dot bp-dot"></span>
+          <span class="map-item-name">Big picture <span class="bp-sub">all maps</span></span>
+          ${bpActive ? '<span class="map-item-current">current</span>' : ''}
+        </button>
+      `;
+      const liItem = `
+        <button type="button" class="map-item li-item${liActive ? ' active' : ''}" data-map-id="${LOCKED_MAP_ID}">
+          <span class="map-dot li-dot"></span>
+          <span class="map-item-name">Locked In <span class="bp-sub">${lockedCount} priority · due</span></span>
+          ${liActive ? '<span class="map-item-current">current</span>' : ''}
+        </button>
+      `;
+      const items = state.maps.map(m => {
+        const isActive = !state.bigPicture && !state.lockedIn && m.id === state.doc.id;
+        return `
+          <button type="button" class="map-item${isActive ? ' active' : ''}" data-map-id="${escapeHtml(m.id)}">
+            <span class="map-dot" style="background: ${dotColor(m)};"></span>
+            <span class="map-item-name">${escapeHtml(m.name)}</span>
+            ${isActive ? '<span class="map-item-current">current</span>' : ''}
+          </button>
+        `;
+      }).join('');
+      return bpItem + liItem + items;
+    }
+
+    function renderGridHtml() {
+      // Top row: Big Picture + Locked In, then the five real maps
+      const totalNodes = state.maps.reduce((sum, m) => sum + m.nodes.length, 0);
+      const lockedCount = state.maps.reduce((sum, m) =>
+        sum + m.nodes.filter(n => n.priority || n.dueDate).length, 0);
+      const dotsForBP = state.maps.map(m => {
+        const c = m.color === 'none' ? '#0a0a0a' : (COLORS[m.color]?.fill || '#0a0a0a');
+        return `<span class="bp-mini-dot" style="background: ${c};"></span>`;
+      }).join('');
+      const bpActive = state.bigPicture;
+      const liActive = state.lockedIn;
+      const bpCard = `
+        <button type="button" class="map-card big-picture-card${bpActive ? ' active' : ''}" data-map-id="${ALL_MAP_ID}">
+          <div class="map-card-thumb bp-thumb">
+            <div class="bp-mini-dots">${dotsForBP}</div>
+            <div class="bp-thumb-label">Big picture</div>
+          </div>
+          <div class="map-card-meta">
+            <span class="map-dot bp-dot"></span>
+            <span class="map-card-name">All maps</span>
+          </div>
+          <div class="map-card-count">${totalNodes} nodes${bpActive ? ' · current' : ''}</div>
+        </button>
+      `;
+      const liCard = `
+        <button type="button" class="map-card locked-in-card${liActive ? ' active' : ''}" data-map-id="${LOCKED_MAP_ID}">
+          <div class="map-card-thumb li-thumb">
+            <div class="li-thumb-icon">
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#c73c2e" stroke-width="1.5" stroke-linejoin="round">
+                <polygon points="11,2 13.5,8 20,8 14.7,12 16.7,18.5 11,14.8 5.3,18.5 7.3,12 2,8 8.5,8"/>
+              </svg>
+            </div>
+            <div class="li-thumb-label">Locked In</div>
+          </div>
+          <div class="map-card-meta">
+            <span class="map-dot li-dot"></span>
+            <span class="map-card-name">Priority &amp; due</span>
+          </div>
+          <div class="map-card-count">${lockedCount} item${lockedCount === 1 ? '' : 's'}${liActive ? ' · current' : ''}</div>
+        </button>
+      `;
+
+      const mapCards = state.maps.map(m => {
+        const isActive = !state.bigPicture && !state.lockedIn && m.id === state.doc.id;
+        const isAnchorThumb = !m.color || m.color === 'none';
+        const c = COLORS[m.color] || null;
+        const thumb = renderThumbSVG(m, isAnchorThumb, c);
+        const childCount = m.nodes.length - 1;
+        return `
+          <button type="button" class="map-card${isActive ? ' active' : ''}" data-map-id="${escapeHtml(m.id)}">
+            <div class="map-card-thumb">${thumb}</div>
+            <div class="map-card-meta">
+              <span class="map-dot" style="background: ${dotColor(m)};"></span>
+              <span class="map-card-name">${escapeHtml(m.name)}</span>
+            </div>
+            <div class="map-card-count">${childCount} node${childCount === 1 ? '' : 's'}${isActive ? ' · current' : ''}</div>
+          </button>
+        `;
+      }).join('');
+
+      return bpCard + liCard + mapCards;
+    }
+
+    function refresh() {
+      const body = bg.querySelector('.switcher-body');
+      if (view === 'list') {
+        body.className = 'switcher-body map-list';
+        body.innerHTML = renderListHtml();
+        body.querySelectorAll('.map-item').forEach(wireSwitch);
+      } else {
+        body.className = 'switcher-body map-grid';
+        body.innerHTML = renderGridHtml();
+        body.querySelectorAll('.map-card').forEach(wireSwitch);
+      }
+      bg.querySelectorAll('.view-tab').forEach(t => {
+        t.classList.toggle('active', t.getAttribute('data-view') === view);
+      });
+    }
+
+    function wireSwitch(el) {
+      el.addEventListener('click', () => {
+        const id = el.getAttribute('data-map-id');
+        if (id !== state.doc.id) switchMap(id);
+        close({ action: 'switch', id });
+      });
+    }
+
+    const showCurrentActions = !state.bigPicture && !state.lockedIn;
+    bg.innerHTML = `
+      <div class="sheet sheet-tall" role="dialog">
+        <div class="sheet-head">
+          <div>
+            <h3>Switch map</h3>
+            <div class="sub">${state.bigPicture ? 'big picture · pick a map to focus' : (state.lockedIn ? 'locked in · pick a map to focus' : 'seven views · pick one')}</div>
+          </div>
+          <div class="view-tabs">
+            <button type="button" class="view-tab" data-view="grid" aria-label="Grid view">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="1.5" y="1.5" width="5" height="5"/>
+                <rect x="9.5" y="1.5" width="5" height="5"/>
+                <rect x="1.5" y="9.5" width="5" height="5"/>
+                <rect x="9.5" y="9.5" width="5" height="5"/>
+              </svg>
+            </button>
+            <button type="button" class="view-tab" data-view="list" aria-label="List view">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                <line x1="2" y1="4" x2="14" y2="4"/>
+                <line x1="2" y1="8" x2="14" y2="8"/>
+                <line x1="2" y1="12" x2="14" y2="12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="switcher-body"></div>
+        <div class="sheet-actions sheet-actions-narrow">
+          <button data-action="cancel">Done</button>
+          <button data-action="new">+ New map</button>
+          <button data-action="export">Export backup</button>
+          <button data-action="import">Import backup</button>
+          ${showCurrentActions ? '<button data-action="recolor">Recolor</button>' : ''}
+          ${showCurrentActions ? '<button data-action="rename">Rename</button>' : ''}
+        </div>
+        <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;" />
+      </div>
+    `;
+    document.body.appendChild(bg);
+    refresh();
+
+    function close(r) { bg.remove(); resolve(r); }
+    bg.addEventListener('click', e => { if (e.target === bg) close(null); });
+
+    bg.querySelectorAll('.view-tab').forEach(t => {
+      t.addEventListener('click', () => {
+        view = t.getAttribute('data-view');
+        refresh();
+      });
+    });
+
+    bg.querySelector('[data-action="cancel"]').addEventListener('click', () => close(null));
+
+    const renameBtn = bg.querySelector('[data-action="rename"]');
+    if (renameBtn) renameBtn.addEventListener('click', async () => {
+      close(null);
+      const r = await openSheet({ title: 'Rename map', sub: 'this whiteboard', value: state.doc.name, placeholder: 'Map name', primary: 'Save' });
+      if (r) {
+        pushUndo();
+        state.doc.name = r.value;
+        document.getElementById('mapName').textContent = r.value;
+        scheduleSave();
+      }
+    });
+
+    const recolorBtn = bg.querySelector('[data-action="recolor"]');
+    if (recolorBtn) recolorBtn.addEventListener('click', async () => {
+      close(null);
+      const r = await openSheet({
+        title: 'Recolor map',
+        sub: 'pick a hue · neutral = anchor (black)',
+        value: state.doc.name,
+        placeholder: 'Map name',
+        primary: 'Save',
+        swatches: { current: state.doc.color || 'none' }
+      });
+      if (r) {
+        pushUndo();
+        if (r.value && r.value !== state.doc.name) {
+          state.doc.name = r.value;
+          document.getElementById('mapName').textContent = r.value;
+        }
+        if (r.color !== undefined) {
+          state.doc.color = r.color;
+        }
+        render();
+        scheduleSave();
+      }
+    });
+
+    const exportBtn = bg.querySelector('[data-action="export"]');
+    if (exportBtn) exportBtn.addEventListener('click', () => {
+      exportBackup();
+    });
+
+    const newBtn = bg.querySelector('[data-action="new"]');
+    if (newBtn) newBtn.addEventListener('click', async () => {
+      close(null);
+      const r = await openSheet({
+        title: 'New map',
+        sub: 'name it · pick a hue · neutral = anchor (black)',
+        placeholder: 'e.g. Nancy Mace, Q3 Slate, House Reno',
+        primary: 'Create',
+        swatches: { current: 'none' }
+      });
+      if (!r || !r.value) return;
+      await createNewMap(r.value, r.color || 'none');
+    });
+
+    const importBtn = bg.querySelector('[data-action="import"]');
+    const fileIn = bg.querySelector('#importFileInput');
+    if (importBtn && fileIn) {
+      importBtn.addEventListener('click', () => fileIn.click());
+      fileIn.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const data = JSON.parse(text);
+          await importBackup(data);
+          close({ action: 'imported' });
+          toast('Backup restored');
+        } catch (err) {
+          console.error(err);
+          toast('Import failed — bad file');
+        }
+      });
+    }
+  });
+}
+
+// Export current state.maps to a JSON download
+function exportBackup() {
+  const data = state.maps.map(m => ({
+    id: m.id,
+    name: m.name,
+    color: m.color,
+    updatedAt: m.updatedAt,
+    nodes: m.nodes.map(n => ({ ...n }))
+  }));
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `plot-and-scheme-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  // Record the backup time so we can stop nagging
+  try { localStorage.setItem('ps-last-export', String(Date.now())); } catch {}
+  toast('Backup downloaded');
+}
+
+// Import a JSON backup, replacing all maps. Pushes an undo entry first so a bad
+// import can be reversed with Cmd-Z.
+async function importBackup(data) {
+  if (!Array.isArray(data)) throw new Error('Expected an array of maps');
+  // Validate each map has the minimum required fields
+  data.forEach((m, i) => {
+    if (!m.id) throw new Error('Map at index ' + i + ' missing id');
+    if (!Array.isArray(m.nodes)) throw new Error('Map ' + m.id + ' missing nodes');
+  });
+
+  pushUndo();
+
+  // Replace state.maps with deep copies of imported data
+  state.maps = data.map(m => ({
+    id: m.id,
+    name: m.name || 'Untitled',
+    color: m.color || 'none',
+    updatedAt: m.updatedAt || Date.now(),
+    nodes: m.nodes.map(n => ({ ...n }))
+  }));
+
+  // Persist every map immediately
+  for (const m of state.maps) await saveMap(m);
+
+  // Rebind state.doc — keep current map id if it still exists, otherwise first
+  if (state.bigPicture) {
+    state.doc = buildBigPictureDoc();
+  } else {
+    const activeId = state.doc?.id;
+    state.doc = state.maps.find(m => m.id === activeId) || state.maps[0];
+    document.getElementById('mapName').textContent = state.doc.name;
+  }
+  state.selectedId = null;
+  state.multiSelected = null;
+  render();
+  if (!state.bigPicture) centerOnCenter();
+}
+
+// Create a new map with a fresh center node and switch into it.
+// The id is generated from timestamp+random so it never collides with existing maps
+// (including reserved ones like __all__ and __locked__).
+async function createNewMap(name, color) {
+  pushUndo();
+  const id = 'map_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+  const map = {
+    id,
+    name: name.trim(),
+    color: color || 'none',
+    updatedAt: Date.now(),
+    nodes: [
+      { id: 'center', label: name.trim(), type: 'center', x: 800, y: 600 }
+    ]
+  };
+  state.maps.push(map);
+  await saveMap(map);
+  // Switch straight into the new map so user can start dumping nodes immediately
+  switchMap(id);
+  toast('Created ' + name.trim());
+}
+
+// Render a small SVG snapshot of a map for the grid view.
+// Returns SVG markup string. Uses the map's own node positions, scaled to fit.
+function renderThumbSVG(m, isAnchor, mc) {
+  const TW = 130, TH = 90; // thumb canvas size
+  const PAD = 8;
+  // Compute bounding box around nodes
+  if (!m.nodes || m.nodes.length === 0) {
+    return `<svg viewBox="0 0 ${TW} ${TH}" width="${TW}" height="${TH}"></svg>`;
+  }
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  m.nodes.forEach(n => {
+    if (n.x < minX) minX = n.x;
+    if (n.x > maxX) maxX = n.x;
+    if (n.y < minY) minY = n.y;
+    if (n.y > maxY) maxY = n.y;
+  });
+  // Add some padding so nodes aren't on the edge
+  const bw = Math.max(200, maxX - minX);
+  const bh = Math.max(200, maxY - minY);
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  // Fit ratio
+  const scale = Math.min((TW - PAD * 2) / bw, (TH - PAD * 2) / bh);
+
+  function project(x, y) {
+    return {
+      x: TW / 2 + (x - cx) * scale,
+      y: TH / 2 + (y - cy) * scale
+    };
+  }
+
+  const byId = Object.fromEntries(m.nodes.map(n => [n.id, n]));
+  let lines = '';
+  m.nodes.forEach(n => {
+    if (!n.parent) return;
+    const p = byId[n.parent];
+    if (!p) return;
+    const a = project(p.x, p.y), b = project(n.x, n.y);
+    const stroke = isAnchor ? 'rgba(10,10,10,0.45)' : (mc ? mc.todoBorder : 'rgba(10,10,10,0.3)');
+    const op = n.type === 'todo' ? 0.5 : 0.85;
+    lines += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${stroke}" stroke-width="0.7" stroke-opacity="${op}"/>`;
+  });
+
+  let dots = '';
+  m.nodes.forEach(n => {
+    const p = project(n.x, n.y);
+    let r, fill;
+    if (n.type === 'center') {
+      r = 6;
+      fill = isAnchor ? '#0a0a0a' : (mc ? mc.fill : '#0a0a0a');
+    } else if (n.type === 'family') {
+      r = 4;
+      fill = '#0a0a0a';
+    } else if (n.type === 'project') {
+      r = 4;
+      fill = isAnchor ? '#0a0a0a' : (mc ? mc.fill : '#0a0a0a');
+    } else {
+      r = 2.5;
+      fill = isAnchor ? '#0a0a0a' : (mc ? mc.todoBorder : '#6b6b66');
+      if (n.done) fill = '#aeaea6';
+    }
+    dots += `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${fill}"/>`;
+  });
+
+  return `<svg viewBox="0 0 ${TW} ${TH}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">${lines}${dots}</svg>`;
+}
+
+function switchMap(id) {
+  if (id === ALL_MAP_ID) {
+    state.bigPicture = true;
+    state.lockedIn = false;
+    state.doc = buildBigPictureDoc();
+    state.selectedId = null;
+    document.getElementById('mapName').textContent = 'Big picture';
+    document.body.classList.add('big-picture-mode');
+    document.body.classList.remove('locked-in-mode');
+    render();
+    fitAllToView();
+    return;
+  }
+  if (id === LOCKED_MAP_ID) {
+    state.bigPicture = false;
+    state.lockedIn = true;
+    state.doc = buildLockedInDoc();
+    state.selectedId = null;
+    document.getElementById('mapName').textContent = 'Locked In';
+    document.body.classList.remove('big-picture-mode');
+    document.body.classList.add('locked-in-mode');
+    render();
+    fitLockedInToView();
+    return;
+  }
+  const next = state.maps.find(m => m.id === id);
+  if (!next) return;
+  state.bigPicture = false;
+  state.lockedIn = false;
+  state.doc = next;
+  state.selectedId = null;
+  document.getElementById('mapName').textContent = next.name;
+  document.body.classList.remove('big-picture-mode');
+  document.body.classList.remove('locked-in-mode');
+  render();
+  centerOnCenter();
+}
+
+// Build a virtual document that aggregates every node from every real map.
+// Each map gets its own "neighborhood" on a big shared canvas.
+function buildBigPictureDoc() {
+  // Layout: arrange maps in a 3-column grid with generous spacing.
+  const COLS = 3;
+  const CLUSTER_W = 1800;
+  const CLUSTER_H = 1400;
+  const offsets = {};
+  const sourceCenters = {};
+  state.maps.forEach((m, i) => {
+    const col = i % COLS;
+    const row = Math.floor(i / COLS);
+    offsets[m.id] = {
+      dx: col * CLUSTER_W,
+      dy: row * CLUSTER_H
+    };
+    const center = m.nodes.find(n => n.id === 'center');
+    sourceCenters[m.id] = center ? { x: center.x, y: center.y } : { x: 800, y: 600 };
+  });
+
+  const allNodes = [];
+  state.maps.forEach(m => {
+    const off = offsets[m.id];
+    const sc = sourceCenters[m.id];
+    m.nodes.forEach(src => {
+      // Synthetic id is mapId__nodeId so it doesn't collide across maps.
+      const sid = m.id + '__' + src.id;
+      const synth = {
+        id: sid,
+        label: src.label,
+        type: src.type,
+        x: (src.x - sc.x) + off.dx,
+        y: (src.y - sc.y) + off.dy,
+        parent: src.parent ? (m.id + '__' + src.parent) : undefined,
+        done: src.done,
+        color: src.color,  // carry per-node override into big picture
+        _sourceMapId: m.id,
+        _sourceId: src.id,
+        _mapColor: m.color
+      };
+      allNodes.push(synth);
+    });
+  });
+
+  return {
+    id: ALL_MAP_ID,
+    name: 'Big picture',
+    color: 'none',
+    nodes: allNodes,
+    _isBigPicture: true,
+    _offsets: offsets,
+    _sourceCenters: sourceCenters
+  };
+}
+
+// When a synthetic node is dragged, write the change back to the source node.
+function syncBigPictureNodePosition(synthNode) {
+  const map = state.maps.find(m => m.id === synthNode._sourceMapId);
+  if (!map) return;
+  const src = map.nodes.find(n => n.id === synthNode._sourceId);
+  if (!src) return;
+  const off = state.doc._offsets[synthNode._sourceMapId];
+  const sc = state.doc._sourceCenters[synthNode._sourceMapId];
+  src.x = (synthNode.x - off.dx) + sc.x;
+  src.y = (synthNode.y - off.dy) + sc.y;
+}
+
+// Fit the whole big-picture doc into view.
+function fitAllToView() {
+  if (!state.doc || state.doc.nodes.length === 0) return;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  state.doc.nodes.forEach(n => {
+    if (n.x < minX) minX = n.x;
+    if (n.x > maxX) maxX = n.x;
+    if (n.y < minY) minY = n.y;
+    if (n.y > maxY) maxY = n.y;
+  });
+  const PAD = 200;
+  const bw = maxX - minX + PAD * 2;
+  const bh = maxY - minY + PAD * 2;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  state.zoom = Math.min(w / bw, h / bh, 1);
+  state.panX = w / 2 - cx * state.zoom;
+  state.panY = h / 2 - cy * state.zoom;
+  applyTransform();
+}
+
+// Build the Locked In synthetic doc — vertical stack of all priority/dated nodes.
+// Sorted: dated nodes by deadline ascending, then priority-only nodes after.
+function buildLockedInDoc() {
+  // Gather every node that has priority or a due date, with its source map context
+  const items = [];
+  state.maps.forEach(m => {
+    m.nodes.forEach(src => {
+      if (src.priority || src.dueDate) {
+        items.push({
+          src,
+          map: m,
+          mapColor: m.color
+        });
+      }
+    });
+  });
+
+  // Sort: dated first by ascending deadline, then priority-only items
+  items.sort((a, b) => {
+    const ad = a.src.dueDate ? parseDueDate(a.src.dueDate)?.getTime() : null;
+    const bd = b.src.dueDate ? parseDueDate(b.src.dueDate)?.getTime() : null;
+    if (ad !== null && bd !== null) return ad - bd;
+    if (ad !== null && bd === null) return -1; // dated comes before priority-only
+    if (ad === null && bd !== null) return 1;
+    // Both priority-only — group by source map for stability
+    if (a.map.id !== b.map.id) return a.map.id.localeCompare(b.map.id);
+    return 0;
+  });
+
+  // Lay out vertically. Generous spacing so micro nodes have room below each.
+  const COL_X = 800;
+  const TOP_Y = 200;
+  const ROW_GAP = 160; // includes room for the micro node when present
+  const allNodes = [];
+  items.forEach((it, i) => {
+    const sid = it.map.id + '__' + it.src.id;
+    allNodes.push({
+      id: sid,
+      label: it.src.label,
+      type: it.src.type,
+      x: COL_X,
+      y: TOP_Y + i * ROW_GAP,
+      // No parent in Locked In — these are flat list items
+      parent: undefined,
+      done: it.src.done,
+      priority: it.src.priority,
+      dueDate: it.src.dueDate,
+      bold: it.src.bold,
+      color: it.src.color,
+      _sourceMapId: it.map.id,
+      _sourceId: it.src.id,
+      _mapColor: it.mapColor,
+      _mapName: it.map.name
+    });
+  });
+
+  return {
+    id: LOCKED_MAP_ID,
+    name: 'Locked In',
+    color: 'none',
+    nodes: allNodes,
+    _isLockedIn: true,
+    _itemCount: items.length
+  };
+}
+
+// Fit Locked In into view — center horizontally, position scrolled to top
+function fitLockedInToView() {
+  if (!state.doc || state.doc.nodes.length === 0) {
+    // Even empty, position somewhere reasonable
+    const w = wrap.clientWidth;
+    state.zoom = 1;
+    state.panX = w / 2 - 800;
+    state.panY = 100;
+    applyTransform();
+    return;
+  }
+  const w = wrap.clientWidth;
+  state.zoom = 1;
+  state.panX = w / 2 - 800;
+  state.panY = 80; // start near the top so first item is visible
+  applyTransform();
+}
+
+// In big-picture mode, the source node lookup for any synthetic node id.
+function sourceNodeFor(synthId) {
+  const synth = state.doc.nodes.find(n => n.id === synthId);
+  if (!synth || !synth._sourceMapId) return null;
+  const map = state.maps.find(m => m.id === synth._sourceMapId);
+  if (!map) return null;
+  const src = map.nodes.find(n => n.id === synth._sourceId);
+  return src ? { synth, map, src } : null;
+}
+
+function centerOnCenter() {
+  const c = state.doc.nodes.find(n => n.id === 'center');
+  if (!c) return;
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  state.zoom = Math.min(1, Math.min(w / 1600, h / 1200) * 1.4);
+  state.panX = w / 2 - c.x * state.zoom;
+  state.panY = h / 2 - c.y * state.zoom;
+  applyTransform();
+}
+
+window.addEventListener('resize', () => applyTransform());
+
+// Live countdown ticker — updates all visible countdown texts in place without re-rendering
+function tickCountdowns() {
+  const nodes = document.querySelectorAll('text[data-countdown-for]');
+  if (nodes.length === 0) return;
+  nodes.forEach(el => {
+    const id = el.getAttribute('data-countdown-for');
+    const node = state.doc?.nodes.find(n => n.id === id);
+    if (!node || !node.dueDate) return;
+    el.textContent = formatCountdown(node.dueDate);
+  });
+}
+// Tick every second. Cheap: just text content updates on a small number of nodes.
+setInterval(tickCountdowns, 1000);
+
+// Keyboard shortcuts
+window.addEventListener('keydown', (e) => {
+  // Don't intercept while user is typing in inputs
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+
+  const mod = e.metaKey || e.ctrlKey;
+  if (!mod) return;
+  const key = e.key.toLowerCase();
+
+  if (key === 'z') {
+    e.preventDefault();
+    if (e.shiftKey) redo();
+    else undo();
+  } else if (key === 'b') {
+    e.preventDefault();
+    toggleBoldOnSelection();
+  } else if (key === '=' || key === '+') {
+    // Cmd-+ : zoom canvas in (NOT browser page). '=' is the unshifted key for '+'.
+    e.preventDefault();
+    zoomAtViewportCenter(1.2);
+  } else if (key === '-' || key === '_') {
+    // Cmd-- : zoom canvas out
+    e.preventDefault();
+    zoomAtViewportCenter(1 / 1.2);
+  } else if (key === '0') {
+    // Cmd-0 : reset / recenter, matching browser muscle memory
+    e.preventDefault();
+    if (state.bigPicture) fitAllToView();
+    else if (state.lockedIn) fitLockedInToView();
+    else centerOnCenter();
+  }
+});
+
+// Zoom the map canvas around the center of the visible viewport.
+// Keeps whatever's in the middle of the screen anchored as you zoom.
+function zoomAtViewportCenter(factor) {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  const mx = w / 2, my = h / 2;
+  const newZoom = clamp(state.zoom * factor, MIN_ZOOM, MAX_ZOOM);
+  const ratio = newZoom / state.zoom;
+  state.panX = mx - (mx - state.panX) * ratio;
+  state.panY = my - (my - state.panY) * ratio;
+  state.zoom = newZoom;
+  applyTransform();
+}
+
+// ============================================================
+// Boot
+// ============================================================
+(async function boot() {
+  // Ensure we have a passcode before hitting the cloud
+  await ensureCloudAccess();
+
+  let existing = [];
+  let attempts = 0;
+  while (attempts < 3) {
+    try {
+      existing = await loadAllMaps();
+      break;
+    } catch (e) {
+      if (String(e.message) === 'unauthorized') {
+        const p = await promptPassword('Wrong passcode — try again');
+        if (!p) break;
+        setPass(p);
+        attempts++;
+        continue;
+      }
+      // Other errors already fall back to local inside loadAllMapsSynced
+      existing = await loadAllMapsLocal();
+      break;
+    }
+  }
+
+  if (existing && existing.length > 0) {
+    // Sort to match starter order so menu is stable; unknown ones go last.
+    const order = STARTER_MAPS.map(m => m.id);
+    state.maps = existing.slice().sort((a, b) => {
+      const ia = order.indexOf(a.id), ib = order.indexOf(b.id);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
+  } else {
+    state.maps = seedAllMaps();
+    for (const m of state.maps) await saveMap(m);
+  }
+  state.doc = state.maps[0];
+  document.getElementById('mapName').textContent = state.doc.name;
+  render();
+  requestAnimationFrame(centerOnCenter);
+
+  // Gentle backup nudge — if there's real work and it's been 3+ days since last export
+  setTimeout(() => {
+    try {
+      const totalNodes = state.maps.reduce((s, m) => s + m.nodes.length, 0);
+      const centersOnly = state.maps.length; // 1 center per map = "empty"
+      if (totalNodes <= centersOnly) return; // nothing worth backing up yet
+      const last = parseInt(localStorage.getItem('ps-last-export') || '0', 10);
+      const days = (Date.now() - last) / (1000 * 60 * 60 * 24);
+      if (days >= 3) {
+        showBackupReminder(last === 0);
+      }
+    } catch {}
+  }, 2500);
+})();
+
+// A non-blocking reminder bar suggesting an export. Dismissable.
+function showBackupReminder(neverBackedUp) {
+  if (document.getElementById('backupReminder')) return;
+  const bar = document.createElement('div');
+  bar.id = 'backupReminder';
+  bar.style.cssText = `
+    position: fixed; left: 50%; transform: translateX(-50%);
+    top: calc(env(safe-area-inset-top, 0px) + 64px);
+    background: var(--ink); color: var(--paper);
+    font-family: ui-monospace, Menlo, monospace; font-size: 11px;
+    letter-spacing: 0.04em; padding: 10px 12px 10px 16px;
+    border-radius: 4px; z-index: 300; display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 2px 8px rgba(10,10,10,0.2); max-width: calc(100% - 32px);
+  `;
+  const msg = neverBackedUp
+    ? 'Back up your work to be safe'
+    : "It's been a few days — back up your work";
+  bar.innerHTML = `
+    <span>${msg}</span>
+    <button id="backupNow" style="background:var(--paper);color:var(--ink);border:none;border-radius:2px;padding:6px 12px;font-family:inherit;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;">Export</button>
+    <button id="backupDismiss" style="background:transparent;color:var(--ink-faint);border:none;font-size:16px;cursor:pointer;padding:0 4px;line-height:1;">×</button>
+  `;
+  document.body.appendChild(bar);
+  document.getElementById('backupNow').onclick = () => { exportBackup(); bar.remove(); };
+  document.getElementById('backupDismiss').onclick = () => {
+    // Snooze for a day by stamping a recent-ish time
+    try { localStorage.setItem('ps-last-export', String(Date.now() - 2 * 24 * 60 * 60 * 1000)); } catch {}
+    bar.remove();
+  };
+}
+</script>
+</body>
+</html>
